@@ -4058,7 +4058,8 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
             if item.hiddenOffset {
                 heightOffset = -itemHeight
             }
-            let layout = ListViewItemNodeLayout(contentSize: CGSize(width: params.width, height: max(0.0, itemHeight + heightOffset)), insets: insets)
+            let syncGramScale = CGFloat(SyncGramSettings.chatListScale)
+            let layout = ListViewItemNodeLayout(contentSize: CGSize(width: params.width, height: max(0.0, itemHeight * syncGramScale + heightOffset)), insets: insets)
             
             var customActions: [ChatListItemAccessibilityCustomAction] = []
             for option in peerLeftRevealOptions {
@@ -4073,6 +4074,8 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     strongSelf.layoutParams = (item, first, last, firstWithHeader, nextIsPinned, nextHasActiveRevealControls, params, countersSize)
                     strongSelf.nextHasActiveRevealControls = nextHasActiveRevealControls
                     strongSelf.currentItemHeight = itemHeight
+                    strongSelf.layer.anchorPoint = CGPoint(x: 0.5, y: 0.0)
+                    strongSelf.layer.transform = CATransform3DMakeScale(syncGramScale, syncGramScale, 1.0)
                     strongSelf.cachedChatListText = chatListText
                     strongSelf.cachedChatListSearchResult = chatListSearchResult
                     strongSelf.cachedChatListQuoteSearchResult = chatListQuoteSearchResult
@@ -4090,7 +4093,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     }
                                        
                     if case .groupReference = item.content {
-                        strongSelf.layer.sublayerTransform = CATransform3DMakeTranslation(0.0, layout.contentSize.height - itemHeight, 0.0)
+                        strongSelf.layer.sublayerTransform = CATransform3DMakeTranslation(0.0, (layout.contentSize.height - itemHeight) / max(0.1, syncGramScale), 0.0)
                     }
                     
                     if let _ = updatedTheme {

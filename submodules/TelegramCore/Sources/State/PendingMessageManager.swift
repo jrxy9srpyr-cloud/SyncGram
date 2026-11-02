@@ -1373,6 +1373,9 @@ public final class PendingMessageManager {
                         assertionFailure()
                         sendMessageRequest = .fail(MTRpcError(errorCode: 400, errorDescription: "Invalid forward peer ids"))
                     } else if let inputSourcePeerId = forwardPeerIds.first, let inputSourcePeer = transaction.getPeer(inputSourcePeerId).flatMap(apiInputPeer) {
+                        if SyncGramSettings.bypassCopyProtectionEnabled, let channel = transaction.getPeer(inputSourcePeerId) as? TelegramChannel, channel.flags.contains(.copyProtectionEnabled) {
+                            flags |= 1 << 11
+                        }
                         let dependencyTag = PendingMessageRequestDependencyTag(messageId: messages[0].0.id)
 
                         sendMessageRequest = network.request(Api.functions.messages.forwardMessages(flags: flags, fromPeer: inputSourcePeer, id: forwardIds.map { $0.0.id }, randomId: forwardIds.map { $0.1 }, toPeer: inputPeer, topMsgId: topMsgId, replyTo: replyTo, scheduleDate: scheduleTime, scheduleRepeatPeriod: scheduleRepeatPeriod, sendAs: sendAsInputPeer, quickReplyShortcut: quickReplyShortcut, effect: nil, videoTimestamp: videoTimestamp, allowPaidStars: allowPaidStars, suggestedPost: suggestedPost), tag: dependencyTag)
@@ -2027,6 +2030,9 @@ public final class PendingMessageManager {
                         }
                     
                         if let forwardSourceInfoAttribute = forwardSourceInfoAttribute, let sourcePeer = transaction.getPeer(forwardSourceInfoAttribute.messageId.peerId), let sourceInputPeer = apiInputPeer(sourcePeer) {
+                            if SyncGramSettings.bypassCopyProtectionEnabled, let channel = sourcePeer as? TelegramChannel, channel.flags.contains(.copyProtectionEnabled) {
+                                flags |= 1 << 11
+                            }
                             sendMessageRequest = network.request(Api.functions.messages.forwardMessages(flags: flags, fromPeer: sourceInputPeer, id: [sourceInfo.messageId.id], randomId: [uniqueId], toPeer: inputPeer, topMsgId: topMsgId, replyTo: replyTo, scheduleDate: scheduleTime, scheduleRepeatPeriod: scheduleRepeatPeriod, sendAs: sendAsInputPeer, quickReplyShortcut: quickReplyShortcut, effect: nil, videoTimestamp: videoTimestamp, allowPaidStars: allowPaidStars, suggestedPost: suggestedPost), tag: dependencyTag)
                             |> map(NetworkRequestResult.result)
                         } else {

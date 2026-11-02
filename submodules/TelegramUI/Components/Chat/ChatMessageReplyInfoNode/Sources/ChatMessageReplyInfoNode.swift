@@ -672,6 +672,19 @@ public class ChatMessageReplyInfoNode: ASDisplayNode {
                 messageText = NSAttributedString(string: arguments.presentationData.strings.Conversation_Summary_Text, font: textFont, textColor: titleColor)
             }
             
+            if let message = arguments.message, message.isSyncGramDeleted {
+                let authorName = message.effectiveAuthor.flatMap(EnginePeer.init)?.displayTitle(strings: arguments.strings, displayOrder: arguments.presentationData.nameDisplayOrder) ?? arguments.strings.User_DeletedAccount
+                titleString = NSAttributedString(string: "Удалённое сообщение", font: titleFont, textColor: titleColor)
+                let result = NSMutableAttributedString()
+                result.append(NSAttributedString(string: authorName, attributes: [.font: titleFont, .foregroundColor: mainColor]))
+                if let authorId = message.effectiveAuthor?.id {
+                    result.addAttribute(.link, value: "tg://user?id=\(authorId.id)", range: NSRange(location: 0, length: result.length))
+                    result.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: NSRange(location: 0, length: result.length))
+                }
+                result.append(NSAttributedString(string: "\nудалённое сообщение", font: textFont, textColor: textColor))
+                messageText = result
+            }
+
             let (titleLayout, titleApply) = titleNodeLayout(TextNodeLayoutArguments(attributedString: titleString, backgroundColor: nil, maximumNumberOfLines: maxTitleNumberOfLines, truncationType: .end, constrainedSize: CGSize(width: contrainedTextSize.width - additionalTitleWidth, height: contrainedTextSize.height), alignment: .natural, cutout: nil, insets: textInsets))
             if isExpiredStory || isStory || isPoll {
                 contrainedTextSize.width -= 26.0

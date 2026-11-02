@@ -2375,19 +2375,33 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 }
             }, nil)
             var attributes: [MessageAttribute] = []
-            let entities = generateTextEntities(text, enabledTypes: .all)
-            if !entities.isEmpty {
-                attributes.append(TextEntitiesMessageAttribute(entities: entities))
-            }
+            var entities = generateTextEntities(text, enabledTypes: .all)
             let replyMessageSubject = sourceMessageId.flatMap {
                 EngineMessageReplySubject(messageId: $0, quote: nil, innerSubject: nil)
             } ?? strongSelf.presentationInterfaceState.interfaceState.replyMessageSubject?.subjectModel
+            let replyMessage = strongSelf.presentationInterfaceState.interfaceState.replyMessage
+            var messageText = text
+            var sendReplyTo: EngineMessageReplySubject? = replyMessageSubject
+            if let replyMessage, replyMessage.isSyncGramDeleted {
+                let authorName = replyMessage.author?.displayTitle(strings: strongSelf.presentationData.strings, displayOrder: strongSelf.presentationData.nameDisplayOrder) ?? "Удалённый пользователь"
+                let quoteLine = authorName + "\nудалённое сообщение"
+                messageText = quoteLine + "\n" + text
+                let quoteLength = (quoteLine as NSString).length
+                entities.append(MessageTextEntity(range: 0 ..< quoteLength, type: .BlockQuote(isCollapsed: false)))
+                if let authorId = replyMessage.author?.id {
+                    entities.append(MessageTextEntity(range: 0 ..< (authorName as NSString).length, type: .TextUrl(url: "tg://user?id=\(authorId.id)")))
+                }
+                sendReplyTo = nil
+            }
+            if !entities.isEmpty {
+                attributes.append(TextEntitiesMessageAttribute(entities: entities))
+            }
             
             let peerId = strongSelf.chatLocation.peerId
             if peerId?.namespace != Namespaces.Peer.SecretChat, let interactiveEmojis = strongSelf.chatDisplayNode.interactiveEmojis, interactiveEmojis.emojis.contains(text) {
                 strongSelf.sendMessages([.message(text: "", attributes: [], inlineStickers: [:], mediaReference: AnyMediaReference.standalone(media: TelegramMediaDice(emoji: text)), threadId: strongSelf.chatLocation.threadId, replyToMessageId: replyMessageSubject, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])])
             } else {
-                strongSelf.sendMessages([.message(text: text, attributes: attributes, inlineStickers: [:], mediaReference: nil, threadId: strongSelf.chatLocation.threadId, replyToMessageId: replyMessageSubject, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])])
+                strongSelf.sendMessages([.message(text: messageText, attributes: attributes, inlineStickers: [:], mediaReference: nil, threadId: strongSelf.chatLocation.threadId, replyToMessageId: sendReplyTo, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])])
             }
         }, sendSticker: { [weak self] fileReference, silentPosting, schedule, query, clearInput, sourceView, sourceRect, sourceLayer, bubbleUpEmojiOrStickersets in
             guard let strongSelf = self else {

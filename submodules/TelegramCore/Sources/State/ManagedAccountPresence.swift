@@ -43,8 +43,9 @@ private final class AccountPresenceManagerImpl {
     }
     
     private func updatePresence(_ isOnline: Bool) {
+        let effectiveOnline = isOnline && !SyncGramSettings.hideOnlineStatusEnabled
         let request: Signal<Api.Bool, MTRpcError>
-        if isOnline {
+        if effectiveOnline {
             let timer = SignalKitTimer(timeout: 30.0, repeat: false, completion: { [weak self] in
                 guard let strongSelf = self else {
                     return

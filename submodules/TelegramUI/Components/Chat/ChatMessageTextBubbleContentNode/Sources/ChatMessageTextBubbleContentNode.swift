@@ -278,6 +278,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                 let textConstrainedSize = CGSize(width: min(maxTextWidth, constrainedSize.width - horizontalInset), height: constrainedSize.height)
                 
                 var edited = false
+                var deleted = false
                 if item.attributes.updatingMedia != nil {
                     edited = true
                 }
@@ -292,6 +293,8 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                 for attribute in item.message.attributes {
                     if let attribute = attribute as? EditedMessageAttribute {
                         edited = !attribute.isHidden
+                    } else if attribute is SyncGramDeletedMessageAttribute {
+                        deleted = true
                     } else if let attribute = attribute as? ViewCountMessageAttribute {
                         viewCount = attribute.count
                     } else if let attribute = attribute as? ReplyThreadMessageAttribute, case .peer = item.chatLocation {
@@ -312,6 +315,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                     dateFormat = .regular
                 }
                 let dateText = stringForMessageTimestampStatus(context: item.context, message: EngineMessage(item.message), dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, format: dateFormat, associatedData: item.associatedData)
+                let displayDateText = deleted ? "\u{1F5D1} \(dateText)" : dateText
                 
                 let statusType: ChatMessageDateAndStatusType?
                 var displayStatus = false
@@ -710,7 +714,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                         presentationData: item.presentationData,
                         edited: edited && !item.presentationData.isPreview,
                         impressionCount: !item.presentationData.isPreview ? viewCount : nil,
-                        dateText: dateText,
+                        dateText: displayDateText,
                         type: statusType,
                         layoutInput: dateLayoutInput,
                         constrainedSize: textConstrainedSize,
@@ -770,6 +774,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                     return (boundingSize, { [weak self] animation, synchronousLoads, itemApply in
                         if let strongSelf = self {
                             strongSelf.item = item
+                            strongSelf.alpha = deleted ? 0.6 : 1.0
                             if let updatedCachedChatMessageText = updatedCachedChatMessageText {
                                 strongSelf.cachedChatMessageText = updatedCachedChatMessageText
                             }

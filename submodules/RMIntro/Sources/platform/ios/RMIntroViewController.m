@@ -304,16 +304,15 @@ typedef enum {
         
         [self setupGL];
         [self.view addSubview:_glkView];
-        _glkView.hidden = YES;
 
         UIImage *syncGramLogo = [UIImage imageNamed:@"SyncGramLoginLogo"];
         if (syncGramLogo != nil) {
-            _syncGramLogoView = [[UIImageView alloc] initWithFrame:_glkView.frame];
+            _syncGramLogoView = [[UIImageView alloc] initWithFrame:_glkView.bounds];
             _syncGramLogoView.image = syncGramLogo;
             _syncGramLogoView.contentMode = UIViewContentModeScaleAspectFit;
-            _syncGramLogoView.autoresizingMask = _glkView.autoresizingMask;
+            _syncGramLogoView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
             _syncGramLogoView.userInteractionEnabled = NO;
-            [self.view addSubview:_syncGramLogoView];
+            [_glkView addSubview:_syncGramLogoView];
         }
         
         [self startTimer];

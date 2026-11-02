@@ -8,6 +8,8 @@ public enum SyncGramSettings {
         static let bypassCopyProtection = "syncgram.bypassCopyProtection"
         static let allowSecretScreenshots = "syncgram.allowSecretScreenshots"
         static let keepBlockedChats = "syncgram.keepBlockedChats"
+        static let hideOnlineStatus = "syncgram.hideOnlineStatus"
+        static let chatListScale = "syncgram.chatListScale"
     }
 
     private static var defaults: UserDefaults {
@@ -32,5 +34,21 @@ public enum SyncGramSettings {
     public static var keepBlockedChatsEnabled: Bool {
         get { return defaults.bool(forKey: Key.keepBlockedChats) }
         set { defaults.set(newValue, forKey: Key.keepBlockedChats) }
+    }
+
+    public static var hideOnlineStatusEnabled: Bool {
+        get { return defaults.bool(forKey: Key.hideOnlineStatus) }
+        set { defaults.set(newValue, forKey: Key.hideOnlineStatus) }
+    }
+
+    /// 1.0 is the system size. Values below 1.0 make the chat list more compact.
+    public static var chatListScale: Double {
+        get {
+            if defaults.object(forKey: Key.chatListScale) == nil {
+                return 1.0
+            }
+            return min(1.0, max(0.6, defaults.double(forKey: Key.chatListScale)))
+        }
+        set { defaults.set(min(1.0, max(0.6, newValue)), forKey: Key.chatListScale) }
     }
 }

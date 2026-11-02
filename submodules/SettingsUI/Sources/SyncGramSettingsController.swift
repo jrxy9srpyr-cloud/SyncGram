@@ -9,6 +9,7 @@ import AccountContext
 
 private enum SyncGramSettingsToggle: Int32 {
     case ghostMode
+    case hideOnline
     case copyProtection
     case screenshots
     case blockedChats
@@ -16,9 +17,11 @@ private enum SyncGramSettingsToggle: Int32 {
 
 private final class SyncGramSettingsControllerArguments {
     let toggle: (SyncGramSettingsToggle, Bool) -> Void
+    let openChatListSize: () -> Void
 
-    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void) {
+    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void) {
         self.toggle = toggle
+        self.openChatListSize = openChatListSize
     }
 }
 
@@ -29,9 +32,11 @@ private enum SyncGramSettingsSection: Int32 {
 private enum SyncGramSettingsEntry: ItemListNodeEntry {
     case header
     case ghostMode(Bool)
+    case hideOnline(Bool)
     case copyProtection(Bool)
     case screenshots(Bool)
     case blockedChats(Bool)
+    case chatListSize(String)
     case footer
 
     var section: ItemListSectionId {
@@ -44,14 +49,18 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return 0
         case .ghostMode:
             return 1
-        case .copyProtection:
+        case .hideOnline:
             return 2
-        case .screenshots:
+        case .copyProtection:
             return 3
-        case .blockedChats:
+        case .screenshots:
             return 4
-        case .footer:
+        case .blockedChats:
             return 5
+        case .chatListSize:
+            return 6
+        case .footer:
+            return 7
         }
     }
 
@@ -68,6 +77,10 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Удалённые сообщения", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.ghostMode, value)
             })
+        case let .hideOnline(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Режим призрака (не показывать онлайн)", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.hideOnline, value)
+            })
         case let .copyProtection(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Обход защиты от копирования", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.copyProtection, value)
@@ -80,6 +93,10 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Сохранять чаты после блокировки", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.blockedChats, value)
             })
+        case let .chatListSize(value):
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Размер списка чатов", label: value, sectionId: self.section, style: .blocks, action: {
+                arguments.openChatListSize()
+            })
         case .footer:
             return ItemListTextItem(presentationData: presentationData, text: .markdown("Эти настройки действуют только на этом устройстве. Удалённые сообщения остаются в локальной базе, пересылка и сохранение игнорируют клиентскую защиту, а секретные чаты не отправляют уведомления о скриншотах. Сервер по-прежнему может отклонить действие, если оно запрещено на его стороне. SyncGram никуда не отправляет твои данные."), sectionId: self.section)
         }
@@ -90,9 +107,11 @@ private func syncGramSettingsEntries() -> [SyncGramSettingsEntry] {
     return [
         .header,
         .ghostMode(SyncGramSettings.ghostModeEnabled),
+        .hideOnline(SyncGramSettings.hideOnlineStatusEnabled),
         .copyProtection(SyncGramSettings.bypassCopyProtectionEnabled),
         .screenshots(SyncGramSettings.allowSecretScreenshots),
         .blockedChats(SyncGramSettings.keepBlockedChatsEnabled),
+        .chatListSize("\(Int(round(SyncGramSettings.chatListScale * 100.0)))%"),
         .footer
     ]
 }
@@ -100,10 +119,14 @@ private func syncGramSettingsEntries() -> [SyncGramSettingsEntry] {
 public func syncGramSettingsController(context: AccountContext) -> ViewController {
     let revision = ValuePromise<Int>(0, ignoreRepeated: false)
 
+    var openChatListSizeImpl: (() -> Void)?
+
     let arguments = SyncGramSettingsControllerArguments(toggle: { toggle, value in
         switch toggle {
         case .ghostMode:
             SyncGramSettings.ghostModeEnabled = value
+        case .hideOnline:
+            SyncGramSettings.hideOnlineStatusEnabled = value
         case .copyProtection:
             SyncGramSettings.bypassCopyProtectionEnabled = value
         case .screenshots:
@@ -112,6 +135,8 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             SyncGramSettings.keepBlockedChatsEnabled = value
         }
         revision.set(0)
+    }, openChatListSize: {
+        openChatListSizeImpl?()
     })
 
     let signal = combineLatest(queue: .mainQueue(),
@@ -131,5 +156,8 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
 
     let controller = ItemListController(context: context, state: signal)
     controller.navigationPresentation = .modal
+    openChatListSizeImpl = { [weak controller] in
+        controller?.push(SyncGramChatListSizeController(context: context))
+    }
     return controller
 }

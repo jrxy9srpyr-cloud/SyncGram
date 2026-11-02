@@ -80,6 +80,8 @@ enum AccountStateMutationOperation {
     case AddQuickReplyMessages([StoreMessage])
     case DeleteMessagesWithGlobalIds([Int32])
     case DeleteMessages([MessageId])
+    case MarkMessagesDeleted([MessageId])
+    case MarkMessagesDeletedWithGlobalIds([Int32])
     case EditMessage(MessageId, StoreMessage)
     case UpsertEphemeralReplacement(MessageId, StoreMessage)
     case DeleteEphemeralMessages(PeerId, [Int32])
@@ -395,6 +397,14 @@ struct AccountMutableState {
 
     mutating func deleteMessagesWithGlobalIds(_ globalIds: [Int32]) {
         self.addOperation(.DeleteMessagesWithGlobalIds(globalIds))
+    }
+
+    mutating func markMessagesDeleted(_ messageIds: [MessageId]) {
+        self.addOperation(.MarkMessagesDeleted(messageIds))
+    }
+
+    mutating func markMessagesDeletedWithGlobalIds(_ globalIds: [Int32]) {
+        self.addOperation(.MarkMessagesDeletedWithGlobalIds(globalIds))
     }
     
     mutating func deleteMessages(_ messageIds: [MessageId]) {

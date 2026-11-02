@@ -565,6 +565,9 @@ private func sendUploadedMessageContent(
                     }
                 
                     if let forwardSourceInfoAttribute = forwardSourceInfoAttribute, let sourcePeer = transaction.getPeer(forwardSourceInfoAttribute.messageId.peerId), let sourceInputPeer = apiInputPeer(sourcePeer) {
+                        if SyncGramSettings.bypassCopyProtectionEnabled, let channel = sourcePeer as? TelegramChannel, channel.flags.contains(.copyProtectionEnabled) {
+                            flags |= 1 << 11
+                        }
                         sendMessageRequest = network.request(Api.functions.messages.forwardMessages(flags: flags, fromPeer: sourceInputPeer, id: [sourceInfo.messageId.id], randomId: [uniqueId], toPeer: inputPeer, topMsgId: topMsgId, replyTo: nil, scheduleDate: scheduleTime, scheduleRepeatPeriod: scheduleRepeatPeriod, sendAs: sendAsInputPeer, quickReplyShortcut: nil, effect: nil, videoTimestamp: videoTimestamp, allowPaidStars: allowPaidStars, suggestedPost: nil), tag: dependencyTag)
                         |> map(NetworkRequestResult.result)
                     } else {

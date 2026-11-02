@@ -5,6 +5,39 @@ internal import TelegramApi
 import MtProtoKit
 import EncryptionProvider
 
+private func syncGramMarkMessagesDeleted(transaction: Transaction, ids: [MessageId]) {
+    for id in ids {
+        guard let message = transaction.getMessage(id) else {
+            continue
+        }
+        if message.attributes.contains(where: { $0 is SyncGramDeletedMessageAttribute }) {
+            continue
+        }
+        var attributes = message.attributes
+        attributes.append(SyncGramDeletedMessageAttribute())
+        let updated = StoreMessage(
+            id: id,
+            customStableId: nil,
+            globallyUniqueId: message.globallyUniqueId,
+            groupingKey: message.groupingKey,
+            threadId: message.threadId,
+            timestamp: message.timestamp,
+            flags: StoreMessageFlags(message.flags),
+            tags: message.tags,
+            globalTags: message.globalTags,
+            localTags: message.localTags,
+            forwardInfo: message.forwardInfo.flatMap(StoreMessageForwardInfo.init),
+            authorId: message.author?.id,
+            text: message.text,
+            attributes: attributes,
+            media: message.media
+        )
+        transaction.updateMessage(id, update: { _ in
+            return .update(updated)
+        })
+    }
+}
+
 private func reactionGeneratedEvent(_ previousReactions: ReactionsMessageAttribute?, _ updatedReactions: ReactionsMessageAttribute?, message: Message, transaction: Transaction) -> (reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)? {
     if let updatedReactions = updatedReactions, !message.flags.contains(.Incoming), message.id.peerId.namespace == Namespaces.Peer.CloudUser {
         let prev = previousReactions?.reactions ?? []
@@ -972,8 +1005,11 @@ private func finalStateWithUpdatesAndServerTime(accountPeerId: PeerId, postbox: 
                     if previousState.pts >= pts {
                         Logger.shared.log("State", "channel \(peerId) (\((updatedState.peers[peerId] as? TelegramChannel)?.title ?? "nil")) skip old delete update")
                     } else if previousState.pts + ptsCount == pts {
-                        if !SyncGramSettings.ghostModeEnabled {
-                            updatedState.deleteMessages(messages.map({ MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: $0) }))
+                        let messageIds = messages.map({ MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: $0) })
+                        if SyncGramSettings.ghostModeEnabled {
+                            updatedState.markMessagesDeleted(messageIds)
+                        } else {
+                            updatedState.deleteMessages(messageIds)
                         }
                         updatedState.updateChannelState(peerId, pts: pts)
                     } else {
@@ -1066,7 +1102,9 @@ private func finalStateWithUpdatesAndServerTime(accountPeerId: PeerId, postbox: 
                     updatedState.updateMinAvailableMessage(MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: minId))
                 }
             case let .updateDeleteMessages(updateDeleteMessagesData):
-                if !SyncGramSettings.ghostModeEnabled {
+                if SyncGramSettings.ghostModeEnabled {
+                    updatedState.markMessagesDeletedWithGlobalIds(updateDeleteMessagesData.messages)
+                } else {
                     updatedState.deleteMessagesWithGlobalIds(updateDeleteMessagesData.messages)
                 }
             case let .updatePinnedMessages(updatePinnedMessagesData):
@@ -4627,6 +4665,10 @@ func replayFinalState(
                 upsertEphemeralReplacement(transaction: transaction, anchorMessageId: anchorMessageId, message: message)
             case let .DeleteEphemeralMessages(peerId, ids):
                 deleteEphemeralMessages(transaction: transaction, peerId: peerId, ids: ids)
+            case let .MarkMessagesDeletedWithGlobalIds(ids):
+                syncGramMarkMessagesDeleted(transaction: transaction, ids: transaction.messageIdsForGlobalIds(ids))
+            case let .MarkMessagesDeleted(ids):
+                syncGramMarkMessagesDeleted(transaction: transaction, ids: ids)
             case let .DeleteMessagesWithGlobalIds(ids):
                 var resourceIds: [MediaResourceId] = []
                 transaction.deleteMessagesWithGlobalIds(ids, forEachMedia: { media in
