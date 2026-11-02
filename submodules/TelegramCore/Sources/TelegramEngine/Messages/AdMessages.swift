@@ -480,6 +480,9 @@ private class AdMessagesHistoryContextImpl {
         if self.isActivated {
             return
         }
+        if SyncGramSettings.hideAdsEnabled {
+            return
+        }
         self.isActivated = true
         
         let peerId = self.peerId

@@ -16,15 +16,21 @@ private enum SyncGramSettingsToggle: Int32 {
     case copyProtection
     case screenshots
     case blockedChats
+    case hideAds
+    case flipToHide
 }
 
 private final class SyncGramSettingsControllerArguments {
     let toggle: (SyncGramSettingsToggle, Bool) -> Void
     let openChatListSize: () -> Void
+    let openLocalPremium: () -> Void
+    let readAllChats: () -> Void
 
-    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void) {
+    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openLocalPremium: @escaping () -> Void, readAllChats: @escaping () -> Void) {
         self.toggle = toggle
         self.openChatListSize = openChatListSize
+        self.openLocalPremium = openLocalPremium
+        self.readAllChats = readAllChats
     }
 }
 
@@ -42,7 +48,11 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
     case copyProtection(Bool)
     case screenshots(Bool)
     case blockedChats(Bool)
+    case hideAds(Bool)
+    case flipToHide(Bool)
     case chatListSize(String)
+    case localPremium
+    case readAll
     case footer
 
     var section: ItemListSectionId {
@@ -69,10 +79,18 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return 7
         case .blockedChats:
             return 8
-        case .chatListSize:
+        case .hideAds:
             return 9
-        case .footer:
+        case .flipToHide:
             return 10
+        case .chatListSize:
+            return 11
+        case .localPremium:
+            return 12
+        case .readAll:
+            return 13
+        case .footer:
+            return 14
         }
     }
 
@@ -86,40 +104,56 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
         case .header:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "SyncGram", sectionId: self.section)
         case let .ghostMode(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Удалённые сообщения", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Удалённые сообщения", text: "Сохраняет удалённые сообщения локально и помечает их.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.ghostMode, value)
             })
         case let .hideOnline(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Режим призрака (не показывать онлайн)", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Режим призрака (не показывать онлайн)", text: "Не отправляет статус «онлайн».", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideOnline, value)
             })
         case let .hideReads(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не отправлять прочтение", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не отправлять прочтение", text: "Сообщения остаются непрочитанными для собеседника.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideReads, value)
             })
         case let .hideTyping(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не показывать набор текста", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не показывать набор текста", text: "Скрывает «печатает…» и выбор стикеров.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideTyping, value)
             })
         case let .hideStories(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не отмечать просмотр Stories", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не отмечать просмотр Stories", text: "Не отправляет отметку о просмотре Stories.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideStories, value)
             })
         case let .copyProtection(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Обход защиты от копирования", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Обход защиты от копирования", text: "Разрешает пересылку и сохранение защищённого контента.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.copyProtection, value)
             })
         case let .screenshots(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Скриншоты в секретных чатах", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Скриншоты в секретных чатах", text: "Не отправляет собеседнику уведомление о скриншоте.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.screenshots, value)
             })
         case let .blockedChats(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Сохранять чаты после блокировки", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Сохранять чаты после блокировки", text: "Оставляет чат доступным после блокировки или бана.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.blockedChats, value)
+            })
+        case let .hideAds(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Отключение рекламы", text: "Скрывает рекламные сообщения Telegram.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.hideAds, value)
+            })
+        case let .flipToHide(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Скрывать экран при перевороте", text: "Прячет имена, аватары и сообщения, когда телефон лежит экраном вниз.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.flipToHide, value)
             })
         case let .chatListSize(value):
             return ItemListDisclosureItem(presentationData: presentationData, title: "Размер списка чатов", label: value, sectionId: self.section, style: .blocks, action: {
                 arguments.openChatListSize()
+            })
+        case .localPremium:
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Локальный премиум", label: "Список функций", sectionId: self.section, style: .blocks, action: {
+                arguments.openLocalPremium()
+            })
+        case .readAll:
+            return ItemListActionItem(presentationData: presentationData, title: "Прочитать все чаты", kind: .generic, alignment: .center, sectionId: self.section, style: .blocks, action: {
+                arguments.readAllChats()
             })
         case .footer:
             return ItemListTextItem(presentationData: presentationData, text: .markdown("Эти настройки действуют только на этом устройстве. Удалённые сообщения остаются в локальной базе, пересылка и сохранение игнорируют клиентскую защиту, а секретные чаты не отправляют уведомления о скриншотах. Сервер по-прежнему может отклонить действие, если оно запрещено на его стороне. SyncGram никуда не отправляет твои данные."), sectionId: self.section)
@@ -138,7 +172,11 @@ private func syncGramSettingsEntries() -> [SyncGramSettingsEntry] {
         .copyProtection(SyncGramSettings.bypassCopyProtectionEnabled),
         .screenshots(SyncGramSettings.allowSecretScreenshots),
         .blockedChats(SyncGramSettings.keepBlockedChatsEnabled),
+        .hideAds(SyncGramSettings.hideAdsEnabled),
+        .flipToHide(SyncGramSettings.flipToHideEnabled),
         .chatListSize("\(Int(round(SyncGramSettings.chatListScale * 100.0)))%"),
+        .localPremium,
+        .readAll,
         .footer
     ]
 }
@@ -147,6 +185,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     let revision = ValuePromise<Int>(0, ignoreRepeated: false)
 
     var openChatListSizeImpl: (() -> Void)?
+    var openLocalPremiumImpl: (() -> Void)?
 
     let arguments = SyncGramSettingsControllerArguments(toggle: { toggle, value in
         switch toggle {
@@ -166,10 +205,18 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             SyncGramSettings.allowSecretScreenshots = value
         case .blockedChats:
             SyncGramSettings.keepBlockedChatsEnabled = value
+        case .hideAds:
+            SyncGramSettings.hideAdsEnabled = value
+        case .flipToHide:
+            SyncGramSettings.flipToHideEnabled = value
         }
         revision.set(0)
     }, openChatListSize: {
         openChatListSizeImpl?()
+    }, openLocalPremium: {
+        openLocalPremiumImpl?()
+    }, readAllChats: {
+        let _ = context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: .root, filterPredicate: nil)]).startStandalone()
     })
 
     let signal = combineLatest(queue: .mainQueue(),
@@ -191,6 +238,9 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     controller.navigationPresentation = .modal
     openChatListSizeImpl = { [weak controller] in
         controller?.push(SyncGramChatListSizeController(context: context))
+    }
+    openLocalPremiumImpl = { [weak controller] in
+        controller?.push(SyncGramLocalPremiumController(context: context))
     }
     return controller
 }

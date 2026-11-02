@@ -1857,6 +1857,13 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
         }
     }
     
+    if let peer = data.peer {
+        let peerIdValue = peer.id.id._internalGetInt64Value()
+        items[.peerInfo]!.append(PeerInfoScreenDisclosureItem(id: "SyncGramPeerId", label: .text("\(peerIdValue)"), text: "Peer ID", icon: nil, action: {
+            UIPasteboard.general.string = "\(peerIdValue)"
+        }))
+    }
+    
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
     for section in Section.allCases {
         if let sectionItems = items[section], !sectionItems.isEmpty {

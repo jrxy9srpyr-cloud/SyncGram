@@ -12,6 +12,8 @@ public enum SyncGramSettings {
         static let hideReadReceipts = "syncgram.hideReadReceipts"
         static let hideTyping = "syncgram.hideTyping"
         static let hideStoryViews = "syncgram.hideStoryViews"
+        static let hideAds = "syncgram.hideAds"
+        static let flipToHide = "syncgram.flipToHide"
         static let chatListScale = "syncgram.chatListScale"
     }
 
@@ -57,6 +59,16 @@ public enum SyncGramSettings {
     public static var hideStoryViewsEnabled: Bool {
         get { return defaults.bool(forKey: Key.hideStoryViews) }
         set { defaults.set(newValue, forKey: Key.hideStoryViews) }
+    }
+
+    public static var hideAdsEnabled: Bool {
+        get { return defaults.bool(forKey: Key.hideAds) }
+        set { defaults.set(newValue, forKey: Key.hideAds) }
+    }
+
+    public static var flipToHideEnabled: Bool {
+        get { return defaults.bool(forKey: Key.flipToHide) }
+        set { defaults.set(newValue, forKey: Key.flipToHide) }
     }
 
     /// 1.0 is the system size. Values below 1.0 make the chat list more compact.
