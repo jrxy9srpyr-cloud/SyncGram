@@ -309,6 +309,7 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
     private let hasOtherAccounts: Bool
     
     private let animationNode: AnimatedStickerNode
+    private let logoNode: ASImageNode
     private let managedAnimationNode: ManagedPhoneAnimationNode
     private let titleNode: ASTextNode
     private let titleActivateAreaNode: AccessibilityAreaNode
@@ -395,6 +396,11 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         
         self.animationNode = DefaultAnimatedStickerNodeImpl(lottieSettings: .noAccountFallback)
         self.animationNode.setup(source: AnimatedStickerNodeLocalFileSource(name: "IntroPhone"), width: 256, height: 256, playbackMode: .once, mode: .direct(cachePathPrefix: nil))
+        self.logoNode = ASImageNode()
+        self.logoNode.image = UIImage(bundleImageName: "SyncGramLoginLogo")
+        self.logoNode.contentMode = .scaleAspectFit
+        self.logoNode.displaysAsynchronously = false
+        self.logoNode.cornerRadius = 22.0
         
         self.managedAnimationNode = ManagedPhoneAnimationNode(lottieSettings: .noAccountFallback)
         self.managedAnimationNode.isHidden = true
@@ -443,6 +449,7 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         self.addSubnode(self.contactSyncNode)
         self.addSubnode(self.proceedNode)
         self.addSubnode(self.animationNode)
+        self.addSubnode(self.logoNode)
         self.addSubnode(self.managedAnimationNode)
         self.contactSyncNode.isHidden = true
         
@@ -642,8 +649,8 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         if layout.size.width > 320.0 {
             items.insert(AuthorizationLayoutItem(node: self.animationNode, size: animationSize, spacingBefore: AuthorizationLayoutItemSpacing(weight: 10.0, maxValue: 10.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)), at: 0)
             self.proceedNode.isHidden = false
-            self.animationNode.isHidden = false
-            self.animationNode.visibility = true
+            self.animationNode.isHidden = true
+            self.animationNode.visibility = false
         } else {
             insets.top = navigationBarHeight
             self.proceedNode.isHidden = true
@@ -669,6 +676,12 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         transition.updateFrame(node: self.proceedNode, frame: buttonFrame)
         
         self.animationNode.updateLayout(size: animationSize)
+        var logoFrame = self.animationNode.frame
+        if logoFrame.isEmpty || logoFrame.width < 1.0 {
+            let logoSize: CGFloat = 120.0
+            logoFrame = CGRect(x: floor((layout.size.width - logoSize) / 2.0), y: insets.top + 40.0, width: logoSize, height: logoSize)
+        }
+        transition.updateFrame(node: self.logoNode, frame: logoFrame)
         
         let _ = layoutAuthorizationItems(bounds: CGRect(origin: CGPoint(x: bandMinX, y: insets.top), size: CGSize(width: bandWidth, height: layout.size.height - insets.top - insets.bottom - additionalBottomInset)), items: items, transition: transition, failIfDoesNotFit: false)
         

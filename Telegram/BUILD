@@ -326,6 +326,13 @@ filegroup(
     ]),
 )
 
+filegroup(
+    name = "SyncGramIcon",
+    srcs = glob([
+        "Telegram-iOS/SyncGramIcon.xcassets/SyncGram.appiconset/*",
+    ]),
+)
+
 alternate_icon_folders = [
     "BlackIcon",
     "BlackClassicIcon",
@@ -430,7 +437,7 @@ plist_fragment(
             <string>{telegram_bundle_id}</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>telegram</string>
+                <string>syncgram</string>
             </array>
         </dict>
         <dict>
@@ -641,7 +648,7 @@ plist_fragment(
     template =
     """
     <key>CFBundleDisplayName</key>
-    <string>Telegram</string>
+    <string>SyncGram</string>
     """
 )
 
@@ -1696,11 +1703,11 @@ plist_fragment(
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>Telegram</string>
+    <string>SyncGram</string>
     <key>CFBundleIdentifier</key>
     <string>{telegram_bundle_id}</string>
     <key>CFBundleName</key>
-    <string>Telegram</string>
+    <string>SyncGram</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleSignature</key>
@@ -1922,7 +1929,7 @@ ios_application(
         ":RequiredDeviceCapabilitiesPlist",
         ":UrlTypesInfoPlist",
     ],
-    app_icons = [ ":{}_icon".format(name) for name in composer_icon_folders ],
+    app_icons = [":SyncGramIcon"],
     alternate_icons = [
         ":{}".format(name) for name in alternate_icon_folders
     ],

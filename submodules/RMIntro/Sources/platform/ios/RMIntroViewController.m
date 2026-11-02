@@ -106,6 +106,7 @@ typedef enum {
     
     UIView *_wrapperView;
     UIView *_startButton;
+    UIImageView *_syncGramLogoView;
     
     bool _loadedView;
 }
@@ -303,6 +304,17 @@ typedef enum {
         
         [self setupGL];
         [self.view addSubview:_glkView];
+        _glkView.hidden = YES;
+
+        UIImage *syncGramLogo = [UIImage imageNamed:@"SyncGramLoginLogo"];
+        if (syncGramLogo != nil) {
+            _syncGramLogoView = [[UIImageView alloc] initWithFrame:_glkView.frame];
+            _syncGramLogoView.image = syncGramLogo;
+            _syncGramLogoView.contentMode = UIViewContentModeScaleAspectFit;
+            _syncGramLogoView.autoresizingMask = _glkView.autoresizingMask;
+            _syncGramLogoView.userInteractionEnabled = NO;
+            [self.view addSubview:_syncGramLogoView];
+        }
         
         [self startTimer];
         _isOpenGLLoaded = true;
@@ -322,6 +334,8 @@ typedef enum {
     _context = nil;
     [_glkView removeFromSuperview];
     _glkView = nil;
+    [_syncGramLogoView removeFromSuperview];
+    _syncGramLogoView = nil;
     _isOpenGLLoaded = false;
 }
 

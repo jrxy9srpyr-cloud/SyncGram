@@ -153,6 +153,10 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
             interaction.openSettings(.profile)
         }))
         
+        items[.myProfile]!.append(PeerInfoScreenDisclosureItem(id: 1, text: "SyncGram", icon: nil, action: {
+            interaction.openSettings(.syncgram)
+        }))
+        
         if WalletConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 }).isAvailable {
             let balanceText: NSAttributedString
             if let balance = settings.walletBalance, balance > 10_000_000 {

@@ -1,0 +1,73 @@
+name: SyncGram
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 350
+
+    env:
+      API_ID: ${{ secrets.SYNCGRAM_API_ID }}
+      API_HASH: ${{ secrets.SYNCGRAM_API_HASH }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Fix relative submodule URLs (fork)
+        run: |
+          sed -i '' 's#url=\.\./rlottie\.git#url=https://github.com/TelegramMessenger/rlottie.git#' .gitmodules
+          sed -i '' 's#url=\.\./tgcalls\.git#url=https://github.com/TelegramMessenger/tgcalls.git#' .gitmodules
+          grep -n 'url=' .gitmodules | head -20
+
+      - name: Fetch submodules
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --recursive
+          du -sh .
+
+      - name: Select Xcode
+        run: |
+          ls /Applications | grep -E '^Xcode' || true
+          sudo xcode-select -s /Applications/Xcode_27.1.app/Contents/Developer
+          xcodebuild -version
+          df -h /
+
+      - name: Import fake codesigning identity
+        run: python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
+
+      - name: Inject API credentials
+        run: |
+          if [ -n "$API_ID" ]; then
+            python3 -c "import json; p='build-system/syncgram-configuration.json'; c=json.load(open(p)); c['api_id']='$API_ID'; c['api_hash']='$API_HASH'; json.dump(c, open(p,'w'), indent=2); print('api_id injected')"
+          else
+            echo "no API credentials provided, building with placeholders"
+          fi
+
+      - name: Build SyncGram (release, arm64)
+        run: |
+          START=$(date +%s)
+          python3 -u build-system/Make/Make.py --bazelUserRoot=/private/var/tmp/_bazel_root --overrideXcodeVersion build --configurationPath=build-system/syncgram-configuration.json --codesigningInformationPath=build-system/fake-codesigning --configuration=release_arm64 --buildNumber=1000
+          echo "build seconds: $(( $(date +%s) - START ))"
+
+      - name: Collect IPA
+        if: always()
+        run: |
+          mkdir -p build/artifacts
+          for p in bazel-bin/Telegram/Telegram.ipa bazel-out/*/bin/Telegram/Telegram.ipa; do
+            if [ -f "$p" ]; then cp "$p" build/artifacts/SyncGram.ipa; break; fi
+          done
+          ls -lh build/artifacts || true
+
+      - name: Upload IPA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SyncGram-ipa
+          path: build/artifacts/*.ipa
+          if-no-files-found: warn

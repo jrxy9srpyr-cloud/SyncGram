@@ -857,8 +857,8 @@ public final class ChatPresentationInterfaceState: Equatable {
         self.botMenuButton = botMenuButton
         self.showWebView = showWebView
         self.currentSendAsPeerId = currentSendAsPeerId
-        self.copyProtectionEnabled = copyProtectionEnabled
-        self.myCopyProtectionEnabled = myCopyProtectionEnabled
+        self.copyProtectionEnabled = SyncGramSettings.bypassCopyProtectionEnabled ? false : copyProtectionEnabled
+        self.myCopyProtectionEnabled = SyncGramSettings.bypassCopyProtectionEnabled ? false : myCopyProtectionEnabled
         self.hasAtLeast3Messages = hasAtLeast3Messages
         self.hasPlentyOfMessages = hasPlentyOfMessages
         self.isPremium = isPremium

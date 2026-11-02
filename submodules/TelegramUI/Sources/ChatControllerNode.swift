@@ -144,7 +144,7 @@ class HistoryNodeContainer: ASDisplayNode {
     var isSecret: Bool {
         didSet {
             if self.isSecret != oldValue {
-                setLayerDisableScreenshots(self.layer, self.isSecret)
+                setLayerDisableScreenshots(self.layer, self.isSecret && !SyncGramSettings.allowSecretScreenshots)
             }
         }
     }
@@ -159,7 +159,7 @@ class HistoryNodeContainer: ASDisplayNode {
         super.init()
         
         if self.isSecret {
-            setLayerDisableScreenshots(self.layer, self.isSecret)
+            setLayerDisableScreenshots(self.layer, self.isSecret && !SyncGramSettings.allowSecretScreenshots)
         }
     }
 }
@@ -512,7 +512,7 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         
         self.floatingTopicsPanelContainer = ChatControllerTitlePanelNodeContainer()
         
-        setLayerDisableScreenshots(self.titleAccessoryPanelContainer.layer, chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat)
+        setLayerDisableScreenshots(self.titleAccessoryPanelContainer.layer, chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat && !SyncGramSettings.allowSecretScreenshots)
         
         self.inputContextPanelContainer = ChatControllerTitlePanelNodeContainer()
         self.inputContextOverTextPanelContainer = ChatControllerTitlePanelNodeContainer()
@@ -1238,7 +1238,10 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
             }
         }
         
-        let isSecret = self.chatPresentationInterfaceState.copyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat || self.chatLocation.peerId?.isVerificationCodes == true
+        var isSecret = self.chatPresentationInterfaceState.copyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat || self.chatLocation.peerId?.isVerificationCodes == true
+        if SyncGramSettings.allowSecretScreenshots && self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat {
+            isSecret = false
+        }
         if self.historyNodeContainer.isSecret != isSecret {
             #if DEBUG
             self.historyNodeContainer.isSecret = false

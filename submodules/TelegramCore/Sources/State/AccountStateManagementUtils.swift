@@ -972,7 +972,9 @@ private func finalStateWithUpdatesAndServerTime(accountPeerId: PeerId, postbox: 
                     if previousState.pts >= pts {
                         Logger.shared.log("State", "channel \(peerId) (\((updatedState.peers[peerId] as? TelegramChannel)?.title ?? "nil")) skip old delete update")
                     } else if previousState.pts + ptsCount == pts {
-                        updatedState.deleteMessages(messages.map({ MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: $0) }))
+                        if !SyncGramSettings.ghostModeEnabled {
+                            updatedState.deleteMessages(messages.map({ MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: $0) }))
+                        }
                         updatedState.updateChannelState(peerId, pts: pts)
                     } else {
                         if !missingUpdatesFromChannels.contains(peerId) {
@@ -1060,9 +1062,13 @@ private func finalStateWithUpdatesAndServerTime(accountPeerId: PeerId, postbox: 
             case let .updateChannelAvailableMessages(updateChannelAvailableMessagesData):
                 let (channelId, minId) = (updateChannelAvailableMessagesData.channelId, updateChannelAvailableMessagesData.availableMinId)
                 let peerId = PeerId(namespace: Namespaces.Peer.CloudChannel, id: PeerId.Id._internalFromInt64Value(channelId))
-                updatedState.updateMinAvailableMessage(MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: minId))
+                if !SyncGramSettings.ghostModeEnabled {
+                    updatedState.updateMinAvailableMessage(MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: minId))
+                }
             case let .updateDeleteMessages(updateDeleteMessagesData):
-                updatedState.deleteMessagesWithGlobalIds(updateDeleteMessagesData.messages)
+                if !SyncGramSettings.ghostModeEnabled {
+                    updatedState.deleteMessagesWithGlobalIds(updateDeleteMessagesData.messages)
+                }
             case let .updatePinnedMessages(updatePinnedMessagesData):
                 let (flags, peer, messages) = (updatePinnedMessagesData.flags, updatePinnedMessagesData.peer, updatePinnedMessagesData.messages)
                 let peerId = peer.peerId

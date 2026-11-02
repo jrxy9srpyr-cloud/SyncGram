@@ -193,6 +193,7 @@ enum PeerInfoSettingsSection {
     case powerSaving
     case businessSetup
     case profile
+    case syncgram
     case premiumManagement
     case stars
     case ton
