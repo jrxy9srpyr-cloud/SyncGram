@@ -357,7 +357,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                 }
                 
                 var rawText: String
-                let attributedText: NSAttributedString
+                var attributedText: NSAttributedString
                 var messageEntities: [MessageTextEntity]?
                 
                 var mediaDuration: Double? = nil
@@ -607,6 +607,13 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                     attributedText = NSAttributedString(string: rawText, font: textFont, textColor: messageTheme.primaryTextColor)
                 } else {
                     attributedText = NSAttributedString(string: " ", font: textFont, textColor: messageTheme.primaryTextColor)
+                }
+                
+                if let history = item.message.syncGramEditHistory, !history.isEmpty {
+                    let historyText = history.suffix(3).map({ "↳ \($0)" }).joined(separator: "\n")
+                    let mutable = NSMutableAttributedString(attributedString: attributedText)
+                    mutable.append(NSAttributedString(string: "\n\n" + historyText, font: item.presentationData.messageItalicFont, textColor: messageTheme.secondaryTextColor))
+                    attributedText = mutable
                 }
                 
                 // The custom-emoji attribute is not re-applied here: `stringWithAppliedEntities`

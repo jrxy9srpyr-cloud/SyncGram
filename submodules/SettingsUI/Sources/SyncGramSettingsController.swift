@@ -10,6 +10,9 @@ import AccountContext
 private enum SyncGramSettingsToggle: Int32 {
     case ghostMode
     case hideOnline
+    case hideReads
+    case hideTyping
+    case hideStories
     case copyProtection
     case screenshots
     case blockedChats
@@ -33,6 +36,9 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
     case header
     case ghostMode(Bool)
     case hideOnline(Bool)
+    case hideReads(Bool)
+    case hideTyping(Bool)
+    case hideStories(Bool)
     case copyProtection(Bool)
     case screenshots(Bool)
     case blockedChats(Bool)
@@ -51,16 +57,22 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return 1
         case .hideOnline:
             return 2
-        case .copyProtection:
+        case .hideReads:
             return 3
-        case .screenshots:
+        case .hideTyping:
             return 4
-        case .blockedChats:
+        case .hideStories:
             return 5
-        case .chatListSize:
+        case .copyProtection:
             return 6
-        case .footer:
+        case .screenshots:
             return 7
+        case .blockedChats:
+            return 8
+        case .chatListSize:
+            return 9
+        case .footer:
+            return 10
         }
     }
 
@@ -80,6 +92,18 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
         case let .hideOnline(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Режим призрака (не показывать онлайн)", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideOnline, value)
+            })
+        case let .hideReads(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не отправлять прочтение", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.hideReads, value)
+            })
+        case let .hideTyping(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не показывать набор текста", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.hideTyping, value)
+            })
+        case let .hideStories(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не отмечать просмотр Stories", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.hideStories, value)
             })
         case let .copyProtection(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Обход защиты от копирования", value: value, sectionId: self.section, style: .blocks, updated: { value in
@@ -108,6 +132,9 @@ private func syncGramSettingsEntries() -> [SyncGramSettingsEntry] {
         .header,
         .ghostMode(SyncGramSettings.ghostModeEnabled),
         .hideOnline(SyncGramSettings.hideOnlineStatusEnabled),
+        .hideReads(SyncGramSettings.hideReadReceiptsEnabled),
+        .hideTyping(SyncGramSettings.hideTypingEnabled),
+        .hideStories(SyncGramSettings.hideStoryViewsEnabled),
         .copyProtection(SyncGramSettings.bypassCopyProtectionEnabled),
         .screenshots(SyncGramSettings.allowSecretScreenshots),
         .blockedChats(SyncGramSettings.keepBlockedChatsEnabled),
@@ -127,6 +154,12 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             SyncGramSettings.ghostModeEnabled = value
         case .hideOnline:
             SyncGramSettings.hideOnlineStatusEnabled = value
+        case .hideReads:
+            SyncGramSettings.hideReadReceiptsEnabled = value
+        case .hideTyping:
+            SyncGramSettings.hideTypingEnabled = value
+        case .hideStories:
+            SyncGramSettings.hideStoryViewsEnabled = value
         case .copyProtection:
             SyncGramSettings.bypassCopyProtectionEnabled = value
         case .screenshots:

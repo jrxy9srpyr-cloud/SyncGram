@@ -5,6 +5,26 @@ internal import TelegramApi
 import MtProtoKit
 import EncryptionProvider
 
+private func syncGramStoreMessageWithAttributes(_ message: StoreMessage, attributes: [MessageAttribute]) -> StoreMessage {
+    return StoreMessage(
+        id: message.id,
+        customStableId: message.customStableId,
+        globallyUniqueId: message.globallyUniqueId,
+        groupingKey: message.groupingKey,
+        threadId: message.threadId,
+        timestamp: message.timestamp,
+        flags: message.flags,
+        tags: message.tags,
+        globalTags: message.globalTags,
+        localTags: message.localTags,
+        forwardInfo: message.forwardInfo,
+        authorId: message.authorId,
+        text: message.text,
+        attributes: attributes,
+        media: message.media
+    )
+}
+
 private func syncGramMarkMessagesDeleted(transaction: Transaction, ids: [MessageId]) {
     for id in ids {
         guard let message = transaction.getMessage(id) else {
@@ -4724,11 +4744,26 @@ func replayFinalState(
                         return current
                     })
                     
-                    if let message = locallyRenderedMessage(message: message, peers: peers) {
+                    var updatedStoreMessage = message
+                    if previousMessage.text != message.text && !message.text.isEmpty {
+                        var attributes = message.attributes
+                        var history: [String] = []
+                        if let existing = attributes.first(where: { $0 is SyncGramEditHistoryAttribute }) as? SyncGramEditHistoryAttribute {
+                            history = existing.texts
+                            attributes.removeAll(where: { $0 is SyncGramEditHistoryAttribute })
+                        }
+                        if history.last != previousMessage.text {
+                            history.append(previousMessage.text)
+                        }
+                        attributes.append(SyncGramEditHistoryAttribute(texts: history))
+                        updatedStoreMessage = syncGramStoreMessageWithAttributes(message, attributes: attributes)
+                    }
+                    
+                    if let message = locallyRenderedMessage(message: updatedStoreMessage, peers: peers) {
                         generatedEvent = reactionGeneratedEvent(previousMessage.reactionsAttribute, message.reactionsAttribute, message: message, transaction: transaction)
                     }
                     
-                    return .update(mergedServerMessageUpdate(previous: previousMessage, updated: message))
+                    return .update(mergedServerMessageUpdate(previous: previousMessage, updated: updatedStoreMessage))
                 })
                 if let generatedEvent = generatedEvent {
                     addedReactionEvents.append(generatedEvent)

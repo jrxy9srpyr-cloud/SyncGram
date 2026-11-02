@@ -176,6 +176,9 @@ private func requestActivity(postbox: Postbox, network: Network, accountPeerId: 
             }
             
             if let inputPeer = apiInputPeer(peer) {
+                if SyncGramSettings.hideTypingEnabled {
+                    return .complete()
+                }
                 var flags: Int32 = 0
                 let topMessageId = threadId.flatMap { Int32(clamping: $0) }
                 if topMessageId != nil {
@@ -189,6 +192,9 @@ private func requestActivity(postbox: Postbox, network: Network, accountPeerId: 
                     return .complete()
                 }
             } else if let peer = peer as? TelegramSecretChat, activity == .typingText {
+                if SyncGramSettings.hideTypingEnabled {
+                    return .complete()
+                }
                 let _ = PeerId(peer.id.toInt64())
                 return network.request(Api.functions.messages.setEncryptedTyping(peer: .inputEncryptedChat(.init(chatId: Int32(peer.id.id._internalGetInt64Value()), accessHash: peer.accessHash)), typing: .boolTrue))
                 |> `catch` { _ -> Signal<Api.Bool, NoError> in
