@@ -28,14 +28,16 @@ private final class SyncGramSettingsControllerArguments {
     let openLocalPremium: () -> Void
     let openSecurityQuestion: () -> Void
     let openNavigation: () -> Void
+    let openAccounts: () -> Void
     let readAllChats: () -> Void
 
-    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openLocalPremium: @escaping () -> Void, openSecurityQuestion: @escaping () -> Void, openNavigation: @escaping () -> Void, readAllChats: @escaping () -> Void) {
+    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openLocalPremium: @escaping () -> Void, openSecurityQuestion: @escaping () -> Void, openNavigation: @escaping () -> Void, openAccounts: @escaping () -> Void, readAllChats: @escaping () -> Void) {
         self.toggle = toggle
         self.openChatListSize = openChatListSize
         self.openLocalPremium = openLocalPremium
         self.openSecurityQuestion = openSecurityQuestion
         self.openNavigation = openNavigation
+        self.openAccounts = openAccounts
         self.readAllChats = readAllChats
     }
 }
@@ -62,6 +64,7 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
     case localPremium
     case securityQuestion(String)
     case navigation
+    case accounts
     case readAll
     case footer
 
@@ -105,10 +108,12 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return 15
         case .navigation:
             return 16
-        case .readAll:
+        case .accounts:
             return 17
-        case .footer:
+        case .readAll:
             return 18
+        case .footer:
+            return 19
         }
     }
 
@@ -185,6 +190,10 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListDisclosureItem(presentationData: presentationData, title: "Навигация", label: "Вкладки", sectionId: self.section, style: .blocks, action: {
                 arguments.openNavigation()
             })
+        case .accounts:
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Аккаунты", label: "Панель", sectionId: self.section, style: .blocks, action: {
+                arguments.openAccounts()
+            })
         case .readAll:
             return ItemListActionItem(presentationData: presentationData, title: "Прочитать все чаты", kind: .generic, alignment: .center, sectionId: self.section, style: .blocks, action: {
                 arguments.readAllChats()
@@ -214,6 +223,7 @@ private func syncGramSettingsEntries() -> [SyncGramSettingsEntry] {
         .localPremium,
         .securityQuestion(SyncGramChatLock.shared.hasSecurityQuestion ? "Задан" : "Не задан"),
         .navigation,
+        .accounts,
         .readAll,
         .footer
     ]
@@ -226,6 +236,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     var openLocalPremiumImpl: (() -> Void)?
     var openSecurityQuestionImpl: (() -> Void)?
     var openNavigationImpl: (() -> Void)?
+    var openAccountsImpl: (() -> Void)?
 
     let arguments = SyncGramSettingsControllerArguments(toggle: { toggle, value in
         switch toggle {
@@ -263,6 +274,8 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
         openSecurityQuestionImpl?()
     }, openNavigation: {
         openNavigationImpl?()
+    }, openAccounts: {
+        openAccountsImpl?()
     }, readAllChats: {
         let _ = context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: .root, filterPredicate: nil)]).startStandalone()
     })
@@ -295,6 +308,9 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     }
     openNavigationImpl = { [weak controller] in
         controller?.push(SyncGramNavigationController(context: context))
+    }
+    openAccountsImpl = { [weak controller] in
+        controller?.push(SyncGramAccountsPanelController(context: context))
     }
     return controller
 }
