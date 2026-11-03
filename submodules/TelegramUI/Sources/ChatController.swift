@@ -4443,9 +4443,12 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                                         richText = attribute
                                     }
                                 }
-                                strongSelf.editMessageDisposable.set((strongSelf.context.engine.messages.requestEditMessage(messageId: messageId, text: message.text, media: .keep, entities: entities, richText: richText, inlineStickers: [:], webpagePreviewAttribute: nil, disableUrlPreview: false, scheduleInfoAttribute: OutgoingScheduleInfoMessageAttribute(scheduleTime: time, repeatPeriod: repeatPeriod)) |> deliverOnMainQueue).startStrict(next: { result in
-                                }, error: { error in
-                                }))
+                                let scheduleInfo = OutgoingScheduleInfoMessageAttribute(scheduleTime: time, repeatPeriod: repeatPeriod)
+                                let editRequest: Signal<RequestEditMessageResult, RequestEditMessageError> = strongSelf.context.engine.messages.requestEditMessage(messageId: messageId, text: message.text, media: .keep, entities: entities, richText: richText, inlineStickers: [:], webpagePreviewAttribute: nil, disableUrlPreview: false, scheduleInfoAttribute: scheduleInfo)
+                                let editDisposable = (editRequest |> deliverOnMainQueue).startStrict(next: { _ in
+                                }, error: { _ in
+                                })
+                                strongSelf.editMessageDisposable.set(editDisposable)
                             }
                         })
                     })
