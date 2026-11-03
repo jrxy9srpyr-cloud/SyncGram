@@ -900,6 +900,20 @@ func infoItems(
         }
     }
     
+    if let peer = data.peer {
+        let peerIdValue = peer.id.id._internalGetInt64Value()
+        items[.peerInfo]!.append(PeerInfoScreenDisclosureItem(id: "SyncGramPeerId", label: .text("\(peerIdValue)"), text: "Peer ID", icon: nil, action: {
+            UIPasteboard.general.string = "\(peerIdValue)"
+        }))
+    }
+    
+    if let peer = data.peer, peer.id != context.account.peerId {
+        let isLocked = SyncGramChatLock.shared.isLocked(peer.id)
+        items[.peerSettings]!.append(PeerInfoScreenActionItem(id: "SyncGramChatLock", text: isLocked ? "Разблокировать чат" : "Заблокировать чат", color: isLocked ? .destructive : .accent, action: {
+            SyncGramChatLock.shared.setLocked(peer.id, locked: !isLocked)
+        }))
+    }
+
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
     for section in InfoSection.allCases {
         if let sectionItems = items[section], !sectionItems.isEmpty {
@@ -1857,19 +1871,6 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
         }
     }
     
-    if let peer = data.peer {
-        let peerIdValue = peer.id.id._internalGetInt64Value()
-        items[.peerInfo]!.append(PeerInfoScreenDisclosureItem(id: "SyncGramPeerId", label: .text("\(peerIdValue)"), text: "Peer ID", icon: nil, action: {
-            UIPasteboard.general.string = "\(peerIdValue)"
-        }))
-    }
-    
-    if let peer = data.peer, peer.id != context.account.peerId {
-        let isLocked = SyncGramChatLock.shared.isLocked(peer.id)
-        items[.peerSettings]!.append(PeerInfoScreenActionItem(id: "SyncGramChatLock", text: isLocked ? "Разблокировать чат" : "Заблокировать чат", color: isLocked ? .destructive : .accent, action: {
-            SyncGramChatLock.shared.setLocked(peer.id, locked: !isLocked)
-        }))
-    }
     
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
     for section in Section.allCases {
