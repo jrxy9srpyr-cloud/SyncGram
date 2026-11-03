@@ -4443,12 +4443,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                                         richText = attribute
                                     }
                                 }
-                                let scheduleInfo = OutgoingScheduleInfoMessageAttribute(scheduleTime: time, repeatPeriod: repeatPeriod)
-                                let editRequest: Signal<RequestEditMessageResult, RequestEditMessageError> = strongSelf.context.engine.messages.requestEditMessage(messageId: messageId, text: message.text, media: .keep, entities: entities, richText: richText, inlineStickers: [:], webpagePreviewAttribute: nil, disableUrlPreview: false, scheduleInfoAttribute: scheduleInfo)
-                                let editDisposable = (editRequest |> deliverOnMainQueue).startStrict(next: { _ in
-                                }, error: { _ in
-                                })
-                                strongSelf.editMessageDisposable.set(editDisposable)
+                                strongSelf.performScheduledEdit(messageId: messageId, text: message.text, entities: entities, richText: richText, scheduleTime: time, repeatPeriod: repeatPeriod)
                             }
                         })
                     })
@@ -10899,6 +10894,15 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         )
     }
     
+    private func performScheduledEdit(messageId: MessageId, text: String, entities: TextEntitiesMessageAttribute?, richText: RichTextMessageAttribute?, scheduleTime: Int32, repeatPeriod: Int32?) {
+        let scheduleInfo = OutgoingScheduleInfoMessageAttribute(scheduleTime: scheduleTime, repeatPeriod: repeatPeriod)
+        let request: Signal<RequestEditMessageResult, RequestEditMessageError> = self.context.engine.messages.requestEditMessage(messageId: messageId, text: text, media: .keep, entities: entities, richText: richText, inlineStickers: [:], webpagePreviewAttribute: nil, disableUrlPreview: false, scheduleInfoAttribute: scheduleInfo)
+        let disposable: Disposable = (request |> deliverOnMainQueue).start(next: { (_: RequestEditMessageResult) in
+        }, error: { (_: RequestEditMessageError) in
+        })
+        self.editMessageDisposable.set(disposable)
+    }
+
     func presentScheduleTimePicker(style: ChatScheduleTimeControllerStyle = .default, selectedTime: Int32? = nil, selectedRepeatPeriod: Int32? = nil, dismissByTapOutside: Bool = true, presentInOverlay: Bool = false, completion: @escaping (Int32, Int32?) -> Void) {
         self.presentScheduleTimePicker(style: style, selectedTime: selectedTime, selectedRepeatPeriod: selectedRepeatPeriod, dismissByTapOutside: dismissByTapOutside, presentInOverlay: presentInOverlay, completion: { result in
             completion(result.time, result.repeatPeriod)
