@@ -18,6 +18,8 @@ private enum SyncGramSettingsToggle: Int32 {
     case blockedChats
     case hideAds
     case flipToHide
+    case backgroundRefresh
+    case deletedNotifications
 }
 
 private final class SyncGramSettingsControllerArguments {
@@ -50,6 +52,8 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
     case blockedChats(Bool)
     case hideAds(Bool)
     case flipToHide(Bool)
+    case backgroundRefresh(Bool)
+    case deletedNotifications(Bool)
     case chatListSize(String)
     case localPremium
     case readAll
@@ -83,14 +87,18 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return 9
         case .flipToHide:
             return 10
-        case .chatListSize:
+        case .backgroundRefresh:
             return 11
-        case .localPremium:
+        case .deletedNotifications:
             return 12
-        case .readAll:
+        case .chatListSize:
             return 13
-        case .footer:
+        case .localPremium:
             return 14
+        case .readAll:
+            return 15
+        case .footer:
+            return 16
         }
     }
 
@@ -143,6 +151,14 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Скрывать экран при перевороте", text: "Прячет имена, аватары и сообщения, когда телефон лежит экраном вниз.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.flipToHide, value)
             })
+        case let .backgroundRefresh(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Фоновая синхронизация", text: "Иногда проверяет обновления, когда приложение свёрнуто. iOS решает когда.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.backgroundRefresh, value)
+            })
+        case let .deletedNotifications(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Уведомления об удалённых", text: "Показывает локальный баннер, когда удалённое сообщение сохранено.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.deletedNotifications, value)
+            })
         case let .chatListSize(value):
             return ItemListDisclosureItem(presentationData: presentationData, title: "Размер списка чатов", label: value, sectionId: self.section, style: .blocks, action: {
                 arguments.openChatListSize()
@@ -174,6 +190,8 @@ private func syncGramSettingsEntries() -> [SyncGramSettingsEntry] {
         .blockedChats(SyncGramSettings.keepBlockedChatsEnabled),
         .hideAds(SyncGramSettings.hideAdsEnabled),
         .flipToHide(SyncGramSettings.flipToHideEnabled),
+        .backgroundRefresh(SyncGramSettings.backgroundRefreshEnabled),
+        .deletedNotifications(SyncGramSettings.deletedMessageNotificationsEnabled),
         .chatListSize("\(Int(round(SyncGramSettings.chatListScale * 100.0)))%"),
         .localPremium,
         .readAll,
@@ -209,6 +227,10 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             SyncGramSettings.hideAdsEnabled = value
         case .flipToHide:
             SyncGramSettings.flipToHideEnabled = value
+        case .backgroundRefresh:
+            SyncGramSettings.backgroundRefreshEnabled = value
+        case .deletedNotifications:
+            SyncGramSettings.deletedMessageNotificationsEnabled = value
         }
         revision.set(0)
     }, openChatListSize: {

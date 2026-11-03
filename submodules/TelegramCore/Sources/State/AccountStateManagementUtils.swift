@@ -55,6 +55,7 @@ private func syncGramMarkMessagesDeleted(transaction: Transaction, ids: [Message
         transaction.updateMessage(id, update: { _ in
             return .update(updated)
         })
+        SyncGramNotifications.notifyDeletedMessage(message)
     }
 }
 

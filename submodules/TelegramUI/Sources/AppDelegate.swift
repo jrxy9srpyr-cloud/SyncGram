@@ -350,6 +350,19 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
     
     private var recaptchaClientsBySiteKey: [String: Promise<RecaptchaClient>] = [:]
         
+    private func scheduleSyncGramBackgroundRefresh() {
+        guard #available(iOS 13.0, *), SyncGramSettings.backgroundRefreshEnabled else {
+            return
+        }
+        let request = BGAppRefreshTaskRequest(identifier: "\(Bundle.main.bundleIdentifier!).refresh")
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15.0 * 60.0)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch let error {
+            Logger.shared.log("SyncGram", "BG refresh submit error: \(error)")
+        }
+    }
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         precondition(!testIsLaunched)
         testIsLaunched = true
@@ -1639,6 +1652,29 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         #endif
         
         if #available(iOS 13.0, *) {
+            let syncGramRefreshTaskId = "\(Bundle.main.bundleIdentifier!).refresh"
+            BGTaskScheduler.shared.register(forTaskWithIdentifier: syncGramRefreshTaskId, using: DispatchQueue.main) { task in
+                guard let task = task as? BGAppRefreshTask else {
+                    task.setTaskCompleted(success: false)
+                    return
+                }
+                self.scheduleSyncGramBackgroundRefresh()
+                var completed = false
+                let finish: (Bool) -> Void = { success in
+                    if !completed {
+                        completed = true
+                        task.setTaskCompleted(success: success)
+                    }
+                }
+                task.expirationHandler = {
+                    finish(false)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 20.0) {
+                    finish(true)
+                }
+            }
+            self.scheduleSyncGramBackgroundRefresh()
+
             let cleanupTaskId = "\(baseAppBundleId).cleanup"
             
             BGTaskScheduler.shared.register(forTaskWithIdentifier: cleanupTaskId, using: DispatchQueue.main) { task in
