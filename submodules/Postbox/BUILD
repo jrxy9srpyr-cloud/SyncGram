@@ -88,6 +88,7 @@ swift_library(
     visibility = [
         ":clients",
         ":test_clients",
+        "//submodules/SettingsUI:SettingsUI",
     ],
 )
 
