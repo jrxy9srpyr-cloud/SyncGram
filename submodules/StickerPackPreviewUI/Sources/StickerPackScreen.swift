@@ -1190,6 +1190,24 @@ private final class StickerPackContainer: ASDisplayNode {
                 }
             })))
             
+            if let pack = self.currentStickerPack?.0 {
+                items.append(.action(ContextMenuActionItem(text: "Сведения о наборе", textLayout: .multiline, textFont: .small, icon: { _ in
+                    return nil
+                }, action: { [weak self] _, f in
+                    f(.default)
+                    guard let self, let controller = self.controller else {
+                        return
+                    }
+                    let text = "Название: \(pack.title)\nСсылка: \(pack.shortName)\nID: \(pack.id.id)"
+                    let alert = UIAlertController(title: "Сведения о наборе", message: text, preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "Копировать", style: .default, handler: { _ in
+                        UIPasteboard.general.string = text
+                    }))
+                    alert.addAction(UIAlertAction(title: "Закрыть", style: .cancel, handler: nil))
+                    controller.present(alert, in: .window(.root))
+                })))
+            }
+            
             items.append(.separator)
             
             items.append(.action(ContextMenuActionItem(text: self.presentationData.strings.StickerPack_EditInfo, textLayout: .multiline, textFont: .small, parseMarkdown: true, icon: { _ in

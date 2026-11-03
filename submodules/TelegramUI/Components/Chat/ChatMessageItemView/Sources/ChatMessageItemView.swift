@@ -883,6 +883,15 @@ open class ChatMessageItemView: ListViewItemNode, ChatMessageItemNodeProtocol {
             switch button.action {
                 case let .url(url):
                     item.controllerInteraction.longTap(.url(url), ChatControllerInteraction.LongTapParams(message: item.message))
+                case let .callback(_, data):
+                    let callbackData = Data(bytes: data.memory, count: data.length)
+                    let text = String(data: callbackData, encoding: .utf8) ?? callbackData.base64EncodedString()
+                    let alert = UIAlertController(title: "Callback data", message: text, preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "Копировать", style: .default, handler: { _ in
+                        UIPasteboard.general.string = text
+                    }))
+                    alert.addAction(UIAlertAction(title: "Закрыть", style: .cancel, handler: nil))
+                    item.controllerInteraction.presentController(alert, nil)
                 default:
                     break
             }
