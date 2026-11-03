@@ -60,7 +60,49 @@ open class TabBarControllerImpl: ViewController, TabBarController {
     }
     
     public private(set) var controllers: [ViewController] = []
-    
+    public var swipeIndices: [Int] = []
+
+    private var syncGramLeftEdgeGesture: UIScreenEdgePanGestureRecognizer?
+    private var syncGramRightEdgeGesture: UIScreenEdgePanGestureRecognizer?
+
+    override open func viewDidLoad() {
+        super.viewDidLoad()
+
+        let leftGesture = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(self.syncGramSwipeGesture(_:)))
+        leftGesture.edges = .left
+        self.view.addGestureRecognizer(leftGesture)
+        self.syncGramLeftEdgeGesture = leftGesture
+
+        let rightGesture = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(self.syncGramSwipeGesture(_:)))
+        rightGesture.edges = .right
+        self.view.addGestureRecognizer(rightGesture)
+        self.syncGramRightEdgeGesture = rightGesture
+    }
+
+    @objc private func syncGramSwipeGesture(_ gesture: UIScreenEdgePanGestureRecognizer) {
+        guard gesture.state == .ended, !self.swipeIndices.isEmpty else {
+            return
+        }
+        let translation = gesture.translation(in: self.view).x
+        let direction: Int
+        if translation > 40.0 {
+            direction = -1
+        } else if translation < -40.0 {
+            direction = 1
+        } else {
+            return
+        }
+        let current = self.selectedIndex
+        let currentPosition = self.swipeIndices.firstIndex(of: current)
+        let nextPosition: Int
+        if let currentPosition {
+            nextPosition = (currentPosition + direction + self.swipeIndices.count) % self.swipeIndices.count
+        } else {
+            nextPosition = direction > 0 ? 0 : self.swipeIndices.count - 1
+        }
+        self.selectedIndex = self.swipeIndices[max(0, min(self.swipeIndices.count - 1, nextPosition))]
+    }
+
     private let _ready = Promise<Bool>()
     override open var ready: Promise<Bool> {
         return self._ready

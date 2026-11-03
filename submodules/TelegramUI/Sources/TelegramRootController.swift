@@ -196,6 +196,36 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         super.containerLayoutUpdated(layout, transition: transition)
     }
     
+    private func syncGramOrderedControllers(_ pairs: [(SyncGramTabId, ViewController?)]) -> [(SyncGramTabId, ViewController)] {
+        var result: [(SyncGramTabId, ViewController)] = []
+        for tab in SyncGramNavigationSettings.shared.bottomTabs {
+            if let controller = pairs.first(where: { $0.0 == tab })?.1 {
+                result.append((tab, controller))
+            }
+        }
+        if !result.contains(where: { $0.0 == .chats }) {
+            if let controller = pairs.first(where: { $0.0 == .chats })?.1 {
+                result.insert((.chats, controller), at: 0)
+            }
+        }
+        if !result.contains(where: { $0.0 == .settings }) {
+            if let controller = pairs.first(where: { $0.0 == .settings })?.1 {
+                result.append((.settings, controller))
+            }
+        }
+        return result
+    }
+
+    private func syncGramSwipeIndices(for ordered: [(SyncGramTabId, ViewController)]) -> [Int] {
+        var result: [Int] = []
+        for tab in SyncGramNavigationSettings.shared.swipeTabs {
+            if let index = ordered.firstIndex(where: { $0.0 == tab }) {
+                result.append(index)
+            }
+        }
+        return result
+    }
+
     public func addRootControllers(showCallsTab: Bool, showNewsTab: Bool) {
         let tabBarController = TabBarControllerImpl(theme: self.presentationData.theme, strings: self.presentationData.strings)
         tabBarController.navigationPresentation = .master
@@ -242,8 +272,18 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         accountSettingsController.parentController = self
         controllers.append(accountSettingsController)
                 
-        let chatsIndex = controllers.firstIndex(where: { $0 === chatListController }) ?? 0
-        tabBarController.setControllers(controllers, selectedIndex: restoreSettignsController != nil ? (controllers.count - 1) : chatsIndex)
+        let orderedControllers = self.syncGramOrderedControllers([
+            (.contacts, contactsController),
+            (.calls, showCallsTab ? callListController : nil),
+            (.chats, chatListController),
+            (.news, showNewsTab ? newsController : nil),
+            (.settings, accountSettingsController)
+        ])
+        let orderedPlainControllers = orderedControllers.map({ $0.1 })
+        let chatsIndex = orderedControllers.firstIndex(where: { $0.0 == .chats }) ?? 0
+        let settingsIndex = orderedControllers.firstIndex(where: { $0.0 == .settings }) ?? max(0, orderedControllers.count - 1)
+        tabBarController.swipeIndices = self.syncGramSwipeIndices(for: orderedControllers)
+        tabBarController.setControllers(orderedPlainControllers, selectedIndex: restoreSettignsController != nil ? settingsIndex : chatsIndex)
         
         self.contactsController = contactsController
         self.callListController = callListController
@@ -269,12 +309,21 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         }
         controllers.append(self.accountSettingsController!)
 
+        let orderedControllers = self.syncGramOrderedControllers([
+            (.contacts, self.contactsController),
+            (.calls, showCallsTab ? self.callListController : nil),
+            (.chats, self.chatListController),
+            (.news, showNewsTab ? self.newsController : nil),
+            (.settings, self.accountSettingsController)
+        ])
+        let orderedPlainControllers = orderedControllers.map({ $0.1 })
         // A removed selected tab would otherwise fall back to index 0 (Contacts): select Chats instead.
         var selectedIndex: Int?
-        if let currentController = rootTabController.currentController, !controllers.contains(where: { $0 === currentController }) {
-            selectedIndex = controllers.firstIndex(where: { $0 === self.chatListController })
+        if let currentController = rootTabController.currentController, !orderedPlainControllers.contains(where: { $0 === currentController }) {
+            selectedIndex = orderedControllers.firstIndex(where: { $0.0 == .chats })
         }
-        rootTabController.setControllers(controllers, selectedIndex: selectedIndex)
+        rootTabController.swipeIndices = self.syncGramSwipeIndices(for: orderedControllers)
+        rootTabController.setControllers(orderedPlainControllers, selectedIndex: selectedIndex)
     }
     
     public func openChatsController(activateSearch: Bool, filter: ChatListSearchFilter = .chats, query: String? = nil) {
