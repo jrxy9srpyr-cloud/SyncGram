@@ -1864,6 +1864,13 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
         }))
     }
     
+    if let peer = data.peer, peer.id != context.account.peerId {
+        let isLocked = SyncGramChatLock.shared.isLocked(peer.id)
+        items[.peerSettings]!.append(PeerInfoScreenActionItem(id: "SyncGramChatLock", text: isLocked ? "Разблокировать чат" : "Заблокировать чат", color: isLocked ? .destructive : .accent, action: {
+            SyncGramChatLock.shared.setLocked(peer.id, locked: !isLocked)
+        }))
+    }
+    
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
     for section in Section.allCases {
         if let sectionItems = items[section], !sectionItems.isEmpty {

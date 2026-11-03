@@ -26,12 +26,14 @@ private final class SyncGramSettingsControllerArguments {
     let toggle: (SyncGramSettingsToggle, Bool) -> Void
     let openChatListSize: () -> Void
     let openLocalPremium: () -> Void
+    let openSecurityQuestion: () -> Void
     let readAllChats: () -> Void
 
-    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openLocalPremium: @escaping () -> Void, readAllChats: @escaping () -> Void) {
+    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openLocalPremium: @escaping () -> Void, openSecurityQuestion: @escaping () -> Void, readAllChats: @escaping () -> Void) {
         self.toggle = toggle
         self.openChatListSize = openChatListSize
         self.openLocalPremium = openLocalPremium
+        self.openSecurityQuestion = openSecurityQuestion
         self.readAllChats = readAllChats
     }
 }
@@ -56,6 +58,7 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
     case deletedNotifications(Bool)
     case chatListSize(String)
     case localPremium
+    case securityQuestion(String)
     case readAll
     case footer
 
@@ -95,10 +98,12 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return 13
         case .localPremium:
             return 14
-        case .readAll:
+        case .securityQuestion:
             return 15
-        case .footer:
+        case .readAll:
             return 16
+        case .footer:
+            return 17
         }
     }
 
@@ -167,6 +172,10 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListDisclosureItem(presentationData: presentationData, title: "Локальный премиум", label: "Список функций", sectionId: self.section, style: .blocks, action: {
                 arguments.openLocalPremium()
             })
+        case let .securityQuestion(value):
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Контрольный вопрос", label: value, sectionId: self.section, style: .blocks, action: {
+                arguments.openSecurityQuestion()
+            })
         case .readAll:
             return ItemListActionItem(presentationData: presentationData, title: "Прочитать все чаты", kind: .generic, alignment: .center, sectionId: self.section, style: .blocks, action: {
                 arguments.readAllChats()
@@ -194,6 +203,7 @@ private func syncGramSettingsEntries() -> [SyncGramSettingsEntry] {
         .deletedNotifications(SyncGramSettings.deletedMessageNotificationsEnabled),
         .chatListSize("\(Int(round(SyncGramSettings.chatListScale * 100.0)))%"),
         .localPremium,
+        .securityQuestion(SyncGramChatLock.shared.hasSecurityQuestion ? "Задан" : "Не задан"),
         .readAll,
         .footer
     ]
@@ -204,6 +214,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
 
     var openChatListSizeImpl: (() -> Void)?
     var openLocalPremiumImpl: (() -> Void)?
+    var openSecurityQuestionImpl: (() -> Void)?
 
     let arguments = SyncGramSettingsControllerArguments(toggle: { toggle, value in
         switch toggle {
@@ -237,6 +248,8 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
         openChatListSizeImpl?()
     }, openLocalPremium: {
         openLocalPremiumImpl?()
+    }, openSecurityQuestion: {
+        openSecurityQuestionImpl?()
     }, readAllChats: {
         let _ = context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: .root, filterPredicate: nil)]).startStandalone()
     })
@@ -263,6 +276,9 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     }
     openLocalPremiumImpl = { [weak controller] in
         controller?.push(SyncGramLocalPremiumController(context: context))
+    }
+    openSecurityQuestionImpl = { [weak controller] in
+        controller?.push(SyncGramSecurityQuestionController(context: context))
     }
     return controller
 }

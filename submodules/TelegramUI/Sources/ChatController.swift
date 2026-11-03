@@ -7888,6 +7888,24 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         
         self.didAppear = true
         
+        if let peerId = self.chatLocation.peerId, SyncGramChatLock.shared.isLocked(peerId), !SyncGramChatLock.shared.isUnlocked(peerId) {
+            let overlay = UIView(frame: self.view.bounds)
+            overlay.backgroundColor = self.presentationData.theme.list.plainBackgroundColor
+            overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            self.view.addSubview(overlay)
+            SyncGramChatLock.shared.authenticate(reason: "Разблокировать чат") { [weak self] success in
+                guard let self else {
+                    return
+                }
+                if success {
+                    SyncGramChatLock.shared.markUnlocked(peerId)
+                    overlay.removeFromSuperview()
+                } else {
+                    self.navigationController?.popViewController(animated: true)
+                }
+            }
+        }
+        
         self.chatDisplayNode.historyNode.experimentalSnapScrollToItem = false
         self.chatDisplayNode.historyNode.canReadHistory.set(self.computedCanReadHistoryPromise.get())
         self.chatDisplayNode.historyNode.areContentAnimationsEnabled = true
