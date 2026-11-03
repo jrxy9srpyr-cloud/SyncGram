@@ -1,5 +1,4 @@
 import Foundation
-import TelegramCore
 
 public final class SyncGramStreamSettings {
     public static let shared = SyncGramStreamSettings()
