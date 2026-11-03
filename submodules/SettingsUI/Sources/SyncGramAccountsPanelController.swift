@@ -49,11 +49,11 @@ public final class SyncGramAccountsPanelController: ViewController {
         self.stackView = UIStackView()
         self.addAccountButton = UIButton(type: .system)
         self.feedButton = UIButton(type: .system)
-        super.init(nibName: nil, bundle: nil)
+        super.init(navigationBarPresentationData: nil)
         self.title = "Аккаунты"
     }
 
-    required init?(coder: NSCoder) {
+    required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 

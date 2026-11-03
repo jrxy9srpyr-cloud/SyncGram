@@ -29,11 +29,11 @@ public final class SyncGramCacheController: ViewController {
         self.scrollView = UIScrollView()
         self.stackView = UIStackView()
         self.clearButton = UIButton(type: .system)
-        super.init(nibName: nil, bundle: nil)
+        super.init(navigationBarPresentationData: nil)
         self.title = "Умное управление кэшем"
     }
 
-    required init?(coder: NSCoder) {
+    required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 

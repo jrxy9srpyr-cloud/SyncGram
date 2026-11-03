@@ -38,11 +38,11 @@ public final class SyncGramSecurityQuestionController: ViewController {
         self.resetButton = UIButton(type: .system)
         self.statusLabel = UILabel()
 
-        super.init(nibName: nil, bundle: nil)
+        super.init(navigationBarPresentationData: nil)
         self.title = "Контрольный вопрос"
     }
 
-    required init?(coder: NSCoder) {
+    required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 

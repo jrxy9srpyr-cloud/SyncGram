@@ -22,11 +22,11 @@ public final class SyncGramLocalPremiumController: ViewController {
         self.scrollView = UIScrollView()
         self.stackView = UIStackView()
 
-        super.init(nibName: nil, bundle: nil)
+        super.init(navigationBarPresentationData: nil)
         self.title = "Локальный премиум"
     }
 
-    required init?(coder: NSCoder) {
+    required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 

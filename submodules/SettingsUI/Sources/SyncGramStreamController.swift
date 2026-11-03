@@ -33,11 +33,11 @@ public final class SyncGramStreamController: ViewController {
         self.subtitleLabel = UILabel()
         self.scrollView = UIScrollView()
         self.stackView = UIStackView()
-        super.init(nibName: nil, bundle: nil)
+        super.init(navigationBarPresentationData: nil)
         self.title = "Поток"
     }
 
-    required init?(coder: NSCoder) {
+    required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 

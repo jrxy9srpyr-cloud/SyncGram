@@ -35,11 +35,11 @@ public final class SyncGramStreamChatsController: ViewController {
         self.stackView = UIStackView()
         self.selectAllButton = UIButton(type: .system)
         self.clearButton = UIButton(type: .system)
-        super.init(nibName: nil, bundle: nil)
+        super.init(navigationBarPresentationData: nil)
         self.title = "Чаты для Потока"
     }
 
-    required init?(coder: NSCoder) {
+    required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
