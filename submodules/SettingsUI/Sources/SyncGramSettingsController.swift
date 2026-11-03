@@ -29,15 +29,19 @@ private final class SyncGramSettingsControllerArguments {
     let openSecurityQuestion: () -> Void
     let openNavigation: () -> Void
     let openAccounts: () -> Void
+    let openCache: () -> Void
+    let openStream: () -> Void
     let readAllChats: () -> Void
 
-    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openLocalPremium: @escaping () -> Void, openSecurityQuestion: @escaping () -> Void, openNavigation: @escaping () -> Void, openAccounts: @escaping () -> Void, readAllChats: @escaping () -> Void) {
+    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openLocalPremium: @escaping () -> Void, openSecurityQuestion: @escaping () -> Void, openNavigation: @escaping () -> Void, openAccounts: @escaping () -> Void, openCache: @escaping () -> Void, openStream: @escaping () -> Void, readAllChats: @escaping () -> Void) {
         self.toggle = toggle
         self.openChatListSize = openChatListSize
         self.openLocalPremium = openLocalPremium
         self.openSecurityQuestion = openSecurityQuestion
         self.openNavigation = openNavigation
         self.openAccounts = openAccounts
+        self.openCache = openCache
+        self.openStream = openStream
         self.readAllChats = readAllChats
     }
 }
@@ -65,6 +69,8 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
     case securityQuestion(String)
     case navigation
     case accounts
+    case cache
+    case stream
     case readAll
     case footer
 
@@ -110,10 +116,14 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return 16
         case .accounts:
             return 17
-        case .readAll:
+        case .cache:
             return 18
-        case .footer:
+        case .stream:
             return 19
+        case .readAll:
+            return 20
+        case .footer:
+            return 21
         }
     }
 
@@ -194,6 +204,14 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListDisclosureItem(presentationData: presentationData, title: "Аккаунты", label: "Панель", sectionId: self.section, style: .blocks, action: {
                 arguments.openAccounts()
             })
+        case .cache:
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Умное управление кэшем", label: "Размер и очистка", sectionId: self.section, style: .blocks, action: {
+                arguments.openCache()
+            })
+        case .stream:
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Поток", label: "Все чаты", sectionId: self.section, style: .blocks, action: {
+                arguments.openStream()
+            })
         case .readAll:
             return ItemListActionItem(presentationData: presentationData, title: "Прочитать все чаты", kind: .generic, alignment: .center, sectionId: self.section, style: .blocks, action: {
                 arguments.readAllChats()
@@ -224,6 +242,8 @@ private func syncGramSettingsEntries() -> [SyncGramSettingsEntry] {
         .securityQuestion(SyncGramChatLock.shared.hasSecurityQuestion ? "Задан" : "Не задан"),
         .navigation,
         .accounts,
+        .cache,
+        .stream,
         .readAll,
         .footer
     ]
@@ -237,6 +257,8 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     var openSecurityQuestionImpl: (() -> Void)?
     var openNavigationImpl: (() -> Void)?
     var openAccountsImpl: (() -> Void)?
+    var openCacheImpl: (() -> Void)?
+    var openStreamImpl: (() -> Void)?
 
     let arguments = SyncGramSettingsControllerArguments(toggle: { toggle, value in
         switch toggle {
@@ -276,6 +298,10 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
         openNavigationImpl?()
     }, openAccounts: {
         openAccountsImpl?()
+    }, openCache: {
+        openCacheImpl?()
+    }, openStream: {
+        openStreamImpl?()
     }, readAllChats: {
         let _ = context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: .root, filterPredicate: nil)]).startStandalone()
     })
@@ -311,6 +337,12 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     }
     openAccountsImpl = { [weak controller] in
         controller?.push(SyncGramAccountsPanelController(context: context))
+    }
+    openCacheImpl = { [weak controller] in
+        controller?.push(SyncGramCacheController(context: context))
+    }
+    openStreamImpl = { [weak controller] in
+        controller?.push(SyncGramStreamController(context: context))
     }
     return controller
 }

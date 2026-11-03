@@ -1,0 +1,184 @@
+import Foundation
+import UIKit
+import Display
+import SwiftSignalKit
+import TelegramCore
+import Postbox
+import TelegramPresentationData
+import AccountContext
+
+private struct SyncGramStreamItem {
+    let accountId: AccountRecordId
+    let accountTitle: String
+    let chatTitle: String
+    let text: String
+    let timestamp: Int32
+    let peerId: EnginePeer.Id
+    let messageId: EngineMessage.Id
+}
+
+public final class SyncGramStreamController: UIViewController {
+    private let context: AccountContext
+    private let presentationData: PresentationData
+    private let titleLabel: UILabel
+    private let subtitleLabel: UILabel
+    private let scrollView: UIScrollView
+    private let stackView: UIStackView
+    private let disposable = MetaDisposable()
+
+    public init(context: AccountContext) {
+        self.context = context
+        self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        self.titleLabel = UILabel()
+        self.subtitleLabel = UILabel()
+        self.scrollView = UIScrollView()
+        self.stackView = UIStackView()
+        super.init(nibName: nil, bundle: nil)
+        self.title = "Поток"
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        self.disposable.dispose()
+    }
+
+    override public func viewDidLoad() {
+        super.viewDidLoad()
+        let theme = self.presentationData.theme
+        self.view.backgroundColor = theme.list.plainBackgroundColor
+
+        self.titleLabel.text = "Поток"
+        self.titleLabel.font = Font.semibold(20.0)
+        self.titleLabel.textColor = theme.list.itemPrimaryTextColor
+        self.view.addSubview(self.titleLabel)
+
+        self.subtitleLabel.text = "Последние сообщения из чатов всех аккаунтов в одной хронологической ленте."
+        self.subtitleLabel.font = Font.regular(14.0)
+        self.subtitleLabel.textColor = theme.list.itemSecondaryTextColor
+        self.subtitleLabel.numberOfLines = 0
+        self.view.addSubview(self.subtitleLabel)
+
+        self.scrollView.alwaysBounceVertical = true
+        self.view.addSubview(self.scrollView)
+        self.stackView.axis = .vertical
+        self.stackView.spacing = 8.0
+        self.scrollView.addSubview(self.stackView)
+
+        let signal = self.context.sharedContext.activeAccountContexts
+        |> mapToSignal { _, accounts, _ -> Signal<[SyncGramStreamItem], NoError> in
+            let signals: [Signal<[SyncGramStreamItem], NoError>] = accounts.map { accountId, accountContext, _ in
+                let peerSignal = accountContext.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: accountContext.account.peerId))
+                let listSignal = accountContext.account.viewTracker.tailChatListView(groupId: .root, count: 80)
+                return combineLatest(queue: .mainQueue(), peerSignal, listSignal)
+                |> map { peer, view -> [SyncGramStreamItem] in
+                    let data = accountContext.sharedContext.currentPresentationData.with { $0 }
+                    let accountTitle = peer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? "Аккаунт"
+                    var result: [SyncGramStreamItem] = []
+                    for entry in view.0.entries {
+                        guard case let .MessageEntry(entryData) = entry, let message = entryData.messages.first else { continue }
+                        let chatTitle = entryData.renderedPeer.peer.flatMap(EnginePeer.init)?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? "Чат"
+                        let text = message.text.isEmpty ? "[медиа]" : message.text
+                        result.append(SyncGramStreamItem(accountId: accountId, accountTitle: accountTitle, chatTitle: chatTitle, text: text, timestamp: message.timestamp, peerId: message.id.peerId, messageId: message.id))
+                    }
+                    return result
+                }
+            }
+            return combineLatest(queue: .mainQueue(), signals)
+            |> map { lists -> [SyncGramStreamItem] in
+                return lists.flatMap { $0 }.sorted(by: { $0.timestamp > $1.timestamp })
+            }
+        }
+        |> deliverOnMainQueue
+
+        self.disposable.set(signal.start(next: { [weak self] items in
+            self?.update(items)
+        }))
+    }
+
+    private func update(_ items: [SyncGramStreamItem]) {
+        for view in self.stackView.arrangedSubviews {
+            view.removeFromSuperview()
+        }
+        let theme = self.presentationData.theme
+        if items.isEmpty {
+            let label = UILabel()
+            label.text = "Сообщений пока нет"
+            label.font = Font.regular(15.0)
+            label.textColor = theme.list.itemSecondaryTextColor
+            label.textAlignment = .center
+            self.stackView.addArrangedSubview(label)
+            return
+        }
+
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "HH:mm"
+
+        for item in items.prefix(120) {
+            let button = UIControl()
+            button.backgroundColor = theme.list.itemBlocksBackgroundColor
+            button.layer.cornerRadius = 10.0
+            button.tag = Int(item.accountId.int64)
+            button.accessibilityHint = "\(item.peerId.toInt64())"
+
+            let title = UILabel()
+            title.text = "\(item.chatTitle)"
+            title.font = Font.semibold(15.0)
+            title.textColor = theme.list.itemPrimaryTextColor
+
+            let account = UILabel()
+            account.text = "\(item.accountTitle) · \(timeFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(item.timestamp))))"
+            account.font = Font.regular(11.0)
+            account.textColor = theme.list.itemAccentColor
+
+            let text = UILabel()
+            text.text = String(item.text.prefix(180))
+            text.font = Font.regular(13.0)
+            text.textColor = theme.list.itemSecondaryTextColor
+            text.numberOfLines = 3
+
+            for view in [title, account, text] {
+                view.translatesAutoresizingMaskIntoConstraints = false
+                button.addSubview(view)
+            }
+            NSLayoutConstraint.activate([
+                title.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 12.0),
+                title.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -12.0),
+                title.topAnchor.constraint(equalTo: button.topAnchor, constant: 9.0),
+                account.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+                account.trailingAnchor.constraint(equalTo: title.trailingAnchor),
+                account.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 1.0),
+                text.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+                text.trailingAnchor.constraint(equalTo: title.trailingAnchor),
+                text.topAnchor.constraint(equalTo: account.bottomAnchor, constant: 3.0),
+                text.bottomAnchor.constraint(equalTo: button.bottomAnchor, constant: -9.0)
+            ])
+            button.addTarget(self, action: #selector(self.itemTapped(_:)), for: .touchUpInside)
+            self.stackView.addArrangedSubview(button)
+        }
+    }
+
+    @objc private func itemTapped(_ sender: UIControl) {
+        let accountId = AccountRecordId(rawValue: Int64(sender.tag))
+        guard let peerValue = sender.accessibilityHint, let peerIdValue = Int64(peerValue) else {
+            return
+        }
+        self.context.sharedContext.navigateToChat(accountId: accountId, peerId: EnginePeer.Id(peerIdValue), messageId: nil)
+    }
+
+    override public func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let bounds = self.view.bounds
+        let insets = self.view.safeAreaInsets
+        let width = bounds.width - 40.0
+        self.titleLabel.frame = CGRect(x: 20.0, y: insets.top + 16.0, width: width, height: 28.0)
+        self.subtitleLabel.frame = CGRect(x: 20.0, y: insets.top + 50.0, width: width, height: 44.0)
+        let top = insets.top + 102.0
+        self.scrollView.frame = CGRect(x: 20.0, y: top, width: width, height: bounds.height - top - insets.bottom - 16.0)
+        let height = self.stackView.systemLayoutSizeFitting(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+        self.stackView.frame = CGRect(x: 0.0, y: 0.0, width: width, height: height)
+        self.scrollView.contentSize = CGSize(width: width, height: height)
+    }
+}
