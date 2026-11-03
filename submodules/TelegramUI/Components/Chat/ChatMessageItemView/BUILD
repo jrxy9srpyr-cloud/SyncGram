@@ -10,7 +10,6 @@ swift_library(
         "-warnings-as-errors",
     ],
     deps = [
-        "//submodules/AlertUI:AlertUI",
         "//submodules/AsyncDisplayKit",
         "//submodules/LottieSettings:LottieSettings",
         "//submodules/Display",
