@@ -17,7 +17,7 @@ private struct SyncGramStreamItem {
     let messageId: EngineMessage.Id
 }
 
-public final class SyncGramStreamController: UIViewController {
+public final class SyncGramStreamController: ViewController {
     private let context: AccountContext
     private let presentationData: PresentationData
     private let titleLabel: UILabel

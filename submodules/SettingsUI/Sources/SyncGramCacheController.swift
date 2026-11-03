@@ -6,7 +6,7 @@ import TelegramCore
 import TelegramPresentationData
 import AccountContext
 
-public final class SyncGramCacheController: UIViewController {
+public final class SyncGramCacheController: ViewController {
     private let context: AccountContext
     private let presentationData: PresentationData
     private let titleLabel: UILabel

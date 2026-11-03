@@ -14,7 +14,7 @@ private struct SyncGramStreamChatItem {
     let chatTitle: String
 }
 
-public final class SyncGramStreamChatsController: UIViewController {
+public final class SyncGramStreamChatsController: ViewController {
     private let context: AccountContext
     private let presentationData: PresentationData
     private let titleLabel: UILabel

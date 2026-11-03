@@ -26,7 +26,7 @@ private struct SyncGramAccountPanelItem {
     let latestMessageId: EngineMessage.Id?
 }
 
-public final class SyncGramAccountsPanelController: UIViewController {
+public final class SyncGramAccountsPanelController: ViewController {
     private let context: AccountContext
     private let presentationData: PresentationData
 
@@ -300,7 +300,7 @@ public final class SyncGramAccountsPanelController: UIViewController {
     @objc private func accountTapped(_ sender: UIControl) {
         let id = AccountRecordId(rawValue: Int64(sender.tag))
         SyncGramAccountSettings.shared.markActivity(for: id.int64)
-        self.context.sharedContext.switchToAccount(id: id)
+        self.context.sharedContext.switchToAccount(id: id, fromSettingsController: nil, withChatListController: nil)
     }
 
     @objc private func accountLongPressed(_ gesture: UILongPressGestureRecognizer) {
@@ -311,7 +311,7 @@ public final class SyncGramAccountsPanelController: UIViewController {
         let sheet = UIAlertController(title: "Аккаунт", message: nil, preferredStyle: .actionSheet)
         sheet.addAction(UIAlertAction(title: "Переключиться", style: .default, handler: { [weak self] _ in
             SyncGramAccountSettings.shared.markActivity(for: id.int64)
-            self?.context.sharedContext.switchToAccount(id: id)
+            self?.context.sharedContext.switchToAccount(id: id, fromSettingsController: nil, withChatListController: nil)
         }))
         if self.latestById[id.int64] != nil {
             sheet.addAction(UIAlertAction(title: "Открыть последнее сообщение", style: .default, handler: { [weak self] _ in
@@ -321,8 +321,7 @@ public final class SyncGramAccountsPanelController: UIViewController {
             }))
         }
         sheet.addAction(UIAlertAction(title: "Показать непрочитанные", style: .default, handler: { [weak self] _ in
-            self?.context.sharedContext.switchToAccount(id: id)
-            self?.context.sharedContext.openChatsController(activateSearch: false, filter: .chats, query: nil)
+            self?.context.sharedContext.switchToAccount(id: id, fromSettingsController: nil, withChatListController: nil)
         }))
         sheet.addAction(UIAlertAction(title: "Заглушить на 1 час", style: .default, handler: { _ in
             SyncGramAccountSettings.shared.setMutedUntil(Date(timeIntervalSinceNow: 3600.0), for: id.int64)
@@ -384,8 +383,7 @@ public final class SyncGramAccountsPanelController: UIViewController {
     @objc private func openUnreadTapped(_ sender: UIButton) {
         let id = AccountRecordId(rawValue: Int64(sender.tag))
         SyncGramAccountSettings.shared.markActivity(for: id.int64)
-        self.context.sharedContext.switchToAccount(id: id)
-        self.context.sharedContext.openChatsController(activateSearch: false, filter: .chats, query: nil)
+        self.context.sharedContext.switchToAccount(id: id, fromSettingsController: nil, withChatListController: nil)
     }
 
     @objc private func copyUsernameTapped(_ sender: UIButton) {

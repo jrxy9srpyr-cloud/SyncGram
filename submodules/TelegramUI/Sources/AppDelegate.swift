@@ -367,6 +367,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         precondition(!testIsLaunched)
         testIsLaunched = true
         SyncGramPrivacyOverlay.shared.start()
+        SyncGramSigningInfo.shared.registerLaunch()
         CrashReportCollector.shared.start()
         
         let _ = voipTokenPromise.get().start(next: { token in

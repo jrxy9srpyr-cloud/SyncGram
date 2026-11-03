@@ -5,7 +5,7 @@ import TelegramCore
 import TelegramPresentationData
 import AccountContext
 
-public final class SyncGramChatListSizeController: UIViewController {
+public final class SyncGramChatListSizeController: ViewController {
     private let context: AccountContext
     private let presentationData: PresentationData
 

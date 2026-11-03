@@ -5,7 +5,7 @@ import TelegramCore
 import TelegramPresentationData
 import AccountContext
 
-public final class SyncGramSecurityQuestionController: UIViewController {
+public final class SyncGramSecurityQuestionController: ViewController {
     private let context: AccountContext
     private let presentationData: PresentationData
 

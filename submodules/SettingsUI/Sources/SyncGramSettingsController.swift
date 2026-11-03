@@ -20,6 +20,7 @@ private enum SyncGramSettingsToggle: Int32 {
     case flipToHide
     case backgroundRefresh
     case deletedNotifications
+    case signingNotifications
 }
 
 private final class SyncGramSettingsControllerArguments {
@@ -64,6 +65,8 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
     case flipToHide(Bool)
     case backgroundRefresh(Bool)
     case deletedNotifications(Bool)
+    case signingNotifications(Bool)
+    case signingInfo(String)
     case chatListSize(String)
     case localPremium
     case securityQuestion(String)
@@ -106,24 +109,28 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return 11
         case .deletedNotifications:
             return 12
-        case .chatListSize:
+        case .signingNotifications:
             return 13
-        case .localPremium:
+        case .signingInfo:
             return 14
-        case .securityQuestion:
+        case .chatListSize:
             return 15
-        case .navigation:
+        case .localPremium:
             return 16
-        case .accounts:
+        case .securityQuestion:
             return 17
-        case .cache:
+        case .navigation:
             return 18
-        case .stream:
+        case .accounts:
             return 19
-        case .readAll:
+        case .cache:
             return 20
-        case .footer:
+        case .stream:
             return 21
+        case .readAll:
+            return 22
+        case .footer:
+            return 23
         }
     }
 
@@ -184,6 +191,12 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Уведомления об удалённых", text: "Показывает локальный баннер, когда удалённое сообщение сохранено.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.deletedNotifications, value)
             })
+        case let .signingNotifications(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Уведомлять об окончании подписи", text: "Локальное напоминание за день до истечения и в момент окончания срока.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.signingNotifications, value)
+            })
+        case let .signingInfo(value):
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Срок подписи", label: value, sectionId: self.section, style: .blocks, action: nil)
         case let .chatListSize(value):
             return ItemListDisclosureItem(presentationData: presentationData, title: "Размер списка чатов", label: value, sectionId: self.section, style: .blocks, action: {
                 arguments.openChatListSize()
@@ -223,6 +236,16 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
 }
 
 private func syncGramSettingsEntries() -> [SyncGramSettingsEntry] {
+    let signingInfoText: String = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return "\(SyncGramSigningInfo.shared.daysRemaining) дн. (до \(formatter.string(from: SyncGramSigningInfo.shared.expiryDate)))"
+    }()
+    return syncGramSettingsEntries(signingInfoText: signingInfoText)
+}
+
+private func syncGramSettingsEntries(signingInfoText: String) -> [SyncGramSettingsEntry] {
     return [
         .header,
         .ghostMode(SyncGramSettings.ghostModeEnabled),
@@ -237,6 +260,8 @@ private func syncGramSettingsEntries() -> [SyncGramSettingsEntry] {
         .flipToHide(SyncGramSettings.flipToHideEnabled),
         .backgroundRefresh(SyncGramSettings.backgroundRefreshEnabled),
         .deletedNotifications(SyncGramSettings.deletedMessageNotificationsEnabled),
+        .signingInfo(signingInfoText),
+        .signingNotifications(SyncGramSettings.signingNotificationsEnabled),
         .chatListSize("\(Int(round(SyncGramSettings.chatListScale * 100.0)))%"),
         .localPremium,
         .securityQuestion(SyncGramChatLock.shared.hasSecurityQuestion ? "Задан" : "Не задан"),
@@ -286,6 +311,9 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             SyncGramSettings.backgroundRefreshEnabled = value
         case .deletedNotifications:
             SyncGramSettings.deletedMessageNotificationsEnabled = value
+        case .signingNotifications:
+            SyncGramSettings.signingNotificationsEnabled = value
+            SyncGramSigningInfo.shared.scheduleNotificationsIfNeeded()
         }
         revision.set(0)
     }, openChatListSize: {

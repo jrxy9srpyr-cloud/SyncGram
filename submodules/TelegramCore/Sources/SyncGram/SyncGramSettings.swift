@@ -16,6 +16,7 @@ public enum SyncGramSettings {
         static let flipToHide = "syncgram.flipToHide"
         static let backgroundRefresh = "syncgram.backgroundRefresh"
         static let deletedNotifications = "syncgram.deletedNotifications"
+        static let signingNotifications = "syncgram.signingNotifications"
         static let chatListScale = "syncgram.chatListScale"
     }
 
@@ -86,6 +87,16 @@ public enum SyncGramSettings {
     public static var deletedMessageNotificationsEnabled: Bool {
         get { return defaults.bool(forKey: Key.deletedNotifications) }
         set { defaults.set(newValue, forKey: Key.deletedNotifications) }
+    }
+
+    public static var signingNotificationsEnabled: Bool {
+        get {
+            if defaults.object(forKey: Key.signingNotifications) == nil {
+                return true
+            }
+            return defaults.bool(forKey: Key.signingNotifications)
+        }
+        set { defaults.set(newValue, forKey: Key.signingNotifications) }
     }
 
     /// 1.0 is the system size. Values below 1.0 make the chat list more compact.
