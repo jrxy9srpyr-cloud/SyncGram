@@ -103,9 +103,28 @@ public final class SyncGramStreamController: UIViewController {
             view.removeFromSuperview()
         }
         let theme = self.presentationData.theme
-        if items.isEmpty {
+
+        let selectButton = UIButton(type: .system)
+        selectButton.setTitle("Выбрать чаты для Потока", for: .normal)
+        selectButton.setTitleColor(theme.list.itemAccentColor, for: .normal)
+        selectButton.titleLabel?.font = Font.semibold(15.0)
+        selectButton.addTarget(self, action: #selector(self.selectChatsTapped), for: .touchUpInside)
+        self.stackView.addArrangedSubview(selectButton)
+
+        if !SyncGramStreamSettings.shared.hasSelection {
             let label = UILabel()
-            label.text = "Сообщений пока нет"
+            label.text = "Чаты для Потока не выбраны."
+            label.font = Font.regular(15.0)
+            label.textColor = theme.list.itemSecondaryTextColor
+            label.textAlignment = .center
+            self.stackView.addArrangedSubview(label)
+            return
+        }
+
+        let filtered = items.filter { SyncGramStreamSettings.shared.isSelected(accountId: $0.accountId, peerId: $0.peerId) }
+        if filtered.isEmpty {
+            let label = UILabel()
+            label.text = "В выбранных чатах сообщений пока нет"
             label.font = Font.regular(15.0)
             label.textColor = theme.list.itemSecondaryTextColor
             label.textAlignment = .center
@@ -116,7 +135,7 @@ public final class SyncGramStreamController: UIViewController {
         let timeFormatter = DateFormatter()
         timeFormatter.dateFormat = "HH:mm"
 
-        for item in items.prefix(120) {
+        for item in filtered.prefix(120) {
             let button = UIControl()
             button.backgroundColor = theme.list.itemBlocksBackgroundColor
             button.layer.cornerRadius = 10.0
@@ -158,6 +177,10 @@ public final class SyncGramStreamController: UIViewController {
             button.addTarget(self, action: #selector(self.itemTapped(_:)), for: .touchUpInside)
             self.stackView.addArrangedSubview(button)
         }
+    }
+
+    @objc private func selectChatsTapped() {
+        self.present(SyncGramStreamChatsController(context: self.context), animated: true, completion: nil)
     }
 
     @objc private func itemTapped(_ sender: UIControl) {
