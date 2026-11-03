@@ -1199,11 +1199,12 @@ private final class StickerPackContainer: ASDisplayNode {
                         return
                     }
                     let text = "Название: \(pack.title)\nСсылка: \(pack.shortName)\nID: \(pack.id.id)"
-                    let alert = UIAlertController(title: "Сведения о наборе", message: text, preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "Копировать", style: .default, handler: { _ in
-                        UIPasteboard.general.string = text
-                    }))
-                    alert.addAction(UIAlertAction(title: "Закрыть", style: .cancel, handler: nil))
+                    let alert = textAlertController(context: self.context, updatedPresentationData: controller.updatedPresentationData, title: "Сведения о наборе", text: text, actions: [
+                        TextAlertAction(type: .defaultAction, title: "Копировать", action: {
+                            UIPasteboard.general.string = text
+                        }),
+                        TextAlertAction(type: .genericAction, title: "Закрыть", action: {})
+                    ])
                     controller.present(alert, in: .window(.root))
                 })))
             }

@@ -17,6 +17,7 @@ import ChatMessageItem
 import ChatMessageTransitionNode
 import AnimatedStickerNode
 import TelegramAnimatedStickerNode
+import AlertUI
 
 public func chatMessageItemLayoutConstants(_ constants: (ChatMessageItemLayoutConstants, ChatMessageItemLayoutConstants), params: ListViewItemLayoutParams, presentationData: ChatPresentationData) -> ChatMessageItemLayoutConstants {
     var result: ChatMessageItemLayoutConstants
@@ -886,11 +887,12 @@ open class ChatMessageItemView: ListViewItemNode, ChatMessageItemNodeProtocol {
                 case let .callback(_, data):
                     let callbackData = Data(bytes: data.memory, count: data.length)
                     let text = String(data: callbackData, encoding: .utf8) ?? callbackData.base64EncodedString()
-                    let alert = UIAlertController(title: "Callback data", message: text, preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "Копировать", style: .default, handler: { _ in
-                        UIPasteboard.general.string = text
-                    }))
-                    alert.addAction(UIAlertAction(title: "Закрыть", style: .cancel, handler: nil))
+                    let alert = textAlertController(context: item.context, title: "Callback data", text: text, actions: [
+                        TextAlertAction(type: .defaultAction, title: "Копировать", action: {
+                            UIPasteboard.general.string = text
+                        }),
+                        TextAlertAction(type: .genericAction, title: "Закрыть", action: {})
+                    ])
                     item.controllerInteraction.presentController(alert, nil)
                 default:
                     break
