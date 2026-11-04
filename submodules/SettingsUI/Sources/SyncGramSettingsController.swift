@@ -171,7 +171,7 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
                 arguments.toggle(.flipToHide, value)
             })
         case let .backgroundRefresh(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Фоновая синхронизация", text: "Иногда проверяет обновления, когда приложение свёрнуто. iOS решает когда.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Уведомления в фоне", text: "Иногда проверяет новые сообщения, когда приложение свёрнуто, и показывает локальное уведомление. iOS решает когда; работает без сервера.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.backgroundRefresh, value)
             })
         case let .signingInfo(value):
@@ -291,6 +291,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             NotificationCenter.default.post(name: SyncGramNotificationNames.flipToHideChanged, object: nil)
         case .backgroundRefresh:
             SyncGramSettings.backgroundRefreshEnabled = value
+            NotificationCenter.default.post(name: SyncGramNotificationNames.backgroundRefreshChanged, object: nil)
         }
         revision.set(0)
     }, openChatListSize: {

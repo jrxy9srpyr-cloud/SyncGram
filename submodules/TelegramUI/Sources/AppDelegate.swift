@@ -368,6 +368,9 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         testIsLaunched = true
         SyncGramPrivacyOverlay.shared.start()
         SyncGramSigningInfo.shared.registerLaunch()
+        NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.backgroundRefreshChanged, object: nil, queue: .main, using: { [weak self] _ in
+            self?.scheduleSyncGramBackgroundRefresh()
+        })
         CrashReportCollector.shared.start()
         
         let _ = voipTokenPromise.get().start(next: { token in
@@ -1669,6 +1672,17 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                 }
                 task.expirationHandler = {
                     finish(false)
+                }
+                // Give the account a moment to pull updates after the background launch, then look
+                // for new unread messages and post local notifications for every signed-in account.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
+                    let _ = (self.sharedContextPromise.get()
+                    |> take(1)
+                    |> deliverOnMainQueue).start(next: { applicationContext in
+                        SyncGramBackgroundNotifications.check(sharedContext: applicationContext.sharedContext) {
+                            finish(true)
+                        }
+                    })
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 20.0) {
                     finish(true)

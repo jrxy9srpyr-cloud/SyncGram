@@ -149,6 +149,7 @@ public enum SyncGramNotificationNames {
     public static let navigationChanged = Notification.Name("SyncGramNavigationChanged")
     public static let flipToHideChanged = Notification.Name("SyncGramFlipToHideChanged")
     public static let settingsChanged = Notification.Name("SyncGramSettingsChanged")
+    public static let backgroundRefreshChanged = Notification.Name("SyncGramBackgroundRefreshChanged")
 }
 
 /// Cached chat list scale, so the row layout does not read UserDefaults on every access.
