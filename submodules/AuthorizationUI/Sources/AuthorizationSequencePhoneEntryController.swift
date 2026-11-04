@@ -151,14 +151,14 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
     }
 
     private func decryptSessionFile(data: Data, answer: String) {
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let result: Result<(String, SyncGramSessionSnapshot), Error>
             do {
                 result = .success(try SyncGramSessionArchive.decrypt(data: data, answer: answer))
             } catch {
                 result = .failure(error)
             }
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self else {
                     return
                 }
