@@ -2374,34 +2374,16 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                     })
                 }
             }, nil)
-            var attributes: [MessageAttribute] = []
-            var entities = generateTextEntities(text, enabledTypes: .all)
             let replyMessageSubject = sourceMessageId.flatMap {
                 EngineMessageReplySubject(messageId: $0, quote: nil, innerSubject: nil)
             } ?? strongSelf.presentationInterfaceState.interfaceState.replyMessageSubject?.subjectModel
-            let replyMessage = strongSelf.presentationInterfaceState.interfaceState.replyMessage
-            var messageText = text
-            var sendReplyTo: EngineMessageReplySubject? = replyMessageSubject
-            if let replyMessage, replyMessage.isSyncGramDeleted {
-                let authorName = replyMessage.author?.displayTitle(strings: strongSelf.presentationData.strings, displayOrder: strongSelf.presentationData.nameDisplayOrder) ?? "Удалённый пользователь"
-                let quoteLine = authorName + "\nудалённое сообщение"
-                messageText = quoteLine + "\n" + text
-                let quoteLength = (quoteLine as NSString).length
-                entities.append(MessageTextEntity(range: 0 ..< quoteLength, type: .BlockQuote(isCollapsed: false)))
-                if let authorId = replyMessage.author?.id {
-                    entities.append(MessageTextEntity(range: 0 ..< (authorName as NSString).length, type: .TextUrl(url: "tg://user?id=\(authorId.id)")))
-                }
-                sendReplyTo = nil
-            }
-            if !entities.isEmpty {
-                attributes.append(TextEntitiesMessageAttribute(entities: entities))
-            }
+            let composition = strongSelf.syncGramComposeMessage(text: text, replyMessageSubject: replyMessageSubject)
             
             let peerId = strongSelf.chatLocation.peerId
             if peerId?.namespace != Namespaces.Peer.SecretChat, let interactiveEmojis = strongSelf.chatDisplayNode.interactiveEmojis, interactiveEmojis.emojis.contains(text) {
                 strongSelf.sendMessages([.message(text: "", attributes: [], inlineStickers: [:], mediaReference: AnyMediaReference.standalone(media: TelegramMediaDice(emoji: text)), threadId: strongSelf.chatLocation.threadId, replyToMessageId: replyMessageSubject, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])])
             } else {
-                strongSelf.sendMessages([.message(text: messageText, attributes: attributes, inlineStickers: [:], mediaReference: nil, threadId: strongSelf.chatLocation.threadId, replyToMessageId: sendReplyTo, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])])
+                strongSelf.sendMessages([.message(text: composition.text, attributes: composition.attributes, inlineStickers: [:], mediaReference: nil, threadId: strongSelf.chatLocation.threadId, replyToMessageId: composition.replyMessageSubject, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])])
             }
         }, sendSticker: { [weak self] fileReference, silentPosting, schedule, query, clearInput, sourceView, sourceRect, sourceLayer, bubbleUpEmojiOrStickersets in
             guard let strongSelf = self else {
@@ -4425,29 +4407,8 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 let _ = self.context.engine.messages.sendScheduledMessageNowInteractively(messageId: messageIds.first!).startStandalone()
             }
         }, editScheduledMessagesTime: { [weak self] messageIds in
-            if let strongSelf = self, let messageId = messageIds.first {
-                let _ = strongSelf.presentVoiceMessageDiscardAlert(action: {
-                    let _ = (strongSelf.context.engine.data.get(TelegramEngine.EngineData.Item.Messages.Message(id: messageId))
-                    |> deliverOnMainQueue).startStandalone(next: { [weak self] message in
-                        guard let strongSelf = self, let message = message else {
-                            return
-                        }
-                        strongSelf.presentScheduleTimePicker(selectedTime: message.timestamp, selectedRepeatPeriod: message._asMessage().scheduleRepeatPeriod, completion: { [weak self] time, repeatPeriod in
-                            if let strongSelf = self {
-                                var entities: TextEntitiesMessageAttribute?
-                                var richText: RichTextMessageAttribute?
-                                for attribute in message.attributes {
-                                    if let attribute = attribute as? TextEntitiesMessageAttribute {
-                                        entities = attribute
-                                    } else if let attribute = attribute as? RichTextMessageAttribute {
-                                        richText = attribute
-                                    }
-                                }
-                                strongSelf.performScheduledEdit(messageId: messageId, text: message.text, entities: entities, richText: richText, scheduleTime: time, repeatPeriod: repeatPeriod)
-                            }
-                        })
-                    })
-                }, delay: true)
+            if let strongSelf = self {
+                strongSelf.editScheduledMessageTime(messageIds: messageIds)
             }
         }, performTextSelectionAction: { [weak self] message, canCopy, text, entities, action in
             guard let self else {
@@ -10894,6 +10855,65 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         )
     }
     
+    private func syncGramComposeMessage(text: String, replyMessageSubject: EngineMessageReplySubject?) -> (text: String, attributes: [MessageAttribute], replyMessageSubject: EngineMessageReplySubject?) {
+        var entities = generateTextEntities(text, enabledTypes: .all)
+        var messageText = text
+        var sendReplyTo = replyMessageSubject
+        if let replyMessage = self.presentationInterfaceState.interfaceState.replyMessage, replyMessage.isSyncGramDeleted {
+            let authorName = replyMessage.author?.displayTitle(strings: self.presentationData.strings, displayOrder: self.presentationData.nameDisplayOrder) ?? "Удалённый пользователь"
+            let quoteLine = authorName + "\nудалённое сообщение"
+            messageText = quoteLine + "\n" + text
+            let quoteLength = (quoteLine as NSString).length
+            entities.append(MessageTextEntity(range: 0 ..< quoteLength, type: .BlockQuote(isCollapsed: false)))
+            if let authorId = replyMessage.author?.id {
+                entities.append(MessageTextEntity(range: 0 ..< (authorName as NSString).length, type: .TextUrl(url: "tg://user?id=\(authorId.id)")))
+            }
+            sendReplyTo = nil
+        }
+        var attributes: [MessageAttribute] = []
+        if !entities.isEmpty {
+            attributes.append(TextEntitiesMessageAttribute(entities: entities))
+        }
+        return (messageText, attributes, sendReplyTo)
+    }
+
+    private func editScheduledMessageTime(messageIds: [EngineMessage.Id]) {
+        guard let messageId = messageIds.first else {
+            return
+        }
+        let _ = self.presentVoiceMessageDiscardAlert(action: { [weak self] in
+            guard let self else {
+                return
+            }
+            let _ = (self.context.engine.data.get(TelegramEngine.EngineData.Item.Messages.Message(id: messageId))
+            |> deliverOnMainQueue).startStandalone(next: { [weak self] message in
+                guard let self, let message = message else {
+                    return
+                }
+                self.presentEditScheduleTimePicker(messageId: messageId, message: message)
+            })
+        }, delay: true)
+    }
+
+    private func presentEditScheduleTimePicker(messageId: EngineMessage.Id, message: EngineMessage) {
+        let completion: (Int32, Int32?) -> Void = { [weak self] time, repeatPeriod in
+            guard let self else {
+                return
+            }
+            var entities: TextEntitiesMessageAttribute?
+            var richText: RichTextMessageAttribute?
+            for attribute in message.attributes {
+                if let attribute = attribute as? TextEntitiesMessageAttribute {
+                    entities = attribute
+                } else if let attribute = attribute as? RichTextMessageAttribute {
+                    richText = attribute
+                }
+            }
+            self.performScheduledEdit(messageId: messageId, text: message.text, entities: entities, richText: richText, scheduleTime: time, repeatPeriod: repeatPeriod)
+        }
+        self.presentScheduleTimePicker(selectedTime: message.timestamp, selectedRepeatPeriod: message._asMessage().scheduleRepeatPeriod, completion: completion)
+    }
+
     private func performScheduledEdit(messageId: MessageId, text: String, entities: TextEntitiesMessageAttribute?, richText: RichTextMessageAttribute?, scheduleTime: Int32, repeatPeriod: Int32?) {
         let scheduleInfo = OutgoingScheduleInfoMessageAttribute(scheduleTime: scheduleTime, repeatPeriod: repeatPeriod)
         let request: Signal<RequestEditMessageResult, RequestEditMessageError> = self.context.engine.messages.requestEditMessage(messageId: messageId, text: text, media: .keep, entities: entities, richText: richText, inlineStickers: [:], webpagePreviewAttribute: nil, disableUrlPreview: false, scheduleInfoAttribute: scheduleInfo)
