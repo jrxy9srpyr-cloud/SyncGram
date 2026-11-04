@@ -1234,6 +1234,7 @@ public final class ChatListNode: ListViewImpl {
     private let _ready = ValuePromise<Bool>()
     private var didSetReady = false
     private var syncGramChatListScaleObserver: NSObjectProtocol?
+    private var syncGramStreamRowObserver: NSObjectProtocol?
     public var ready: Signal<Bool, NoError> {
         return _ready.get()
     }
@@ -1448,6 +1449,20 @@ public final class ChatListNode: ListViewImpl {
         // Rebuild the rows as soon as the chat list size changes, so the new size applies
         // immediately instead of only after the next interaction with the list.
         self.syncGramChatListScaleObserver = NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.chatListScaleChanged, object: nil, queue: .main, using: { [weak self] _ in
+            guard let self else {
+                return
+            }
+            let current = self.currentState.presentationData
+            self.updateState { state in
+                var state = state
+                state.presentationData = ChatListPresentationData(theme: current.theme, fontSize: current.fontSize, strings: current.strings, dateTimeFormat: current.dateTimeFormat, nameSortOrder: current.nameSortOrder, nameDisplayOrder: current.nameDisplayOrder, disableAnimations: current.disableAnimations)
+                return state
+            }
+        })
+
+        // Toggling the "Поток" row in settings should add or remove it immediately, without
+        // waiting for the next chat-list update.
+        self.syncGramStreamRowObserver = NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.streamChanged, object: nil, queue: .main, using: { [weak self] _ in
             guard let self else {
                 return
             }
@@ -3220,6 +3235,9 @@ public final class ChatListNode: ListViewImpl {
     
     deinit {
         if let observer = self.syncGramChatListScaleObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = self.syncGramStreamRowObserver {
             NotificationCenter.default.removeObserver(observer)
         }
         self.chatListDisposable.dispose()

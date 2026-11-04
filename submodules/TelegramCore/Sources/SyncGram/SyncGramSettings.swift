@@ -18,6 +18,7 @@ public enum SyncGramSettings {
         static let chatListScale = "syncgram.chatListScale"
         static let shaderEnabled = "syncgram.shaderEnabled"
         static let shaderStyle = "syncgram.shaderStyle"
+        static let streamEnabled = "syncgram.streamEnabled"
     }
 
     private static var defaults: UserDefaults {
@@ -99,6 +100,18 @@ public enum SyncGramSettings {
         set { defaults.set(newValue, forKey: Key.shaderEnabled) }
     }
 
+    /// Shows the synthetic "Поток" row at the top of the chat list. On by default; users who do
+    /// not need the aggregated feed can hide the row without losing their saved selection.
+    public static var streamEnabled: Bool {
+        get {
+            if defaults.object(forKey: Key.streamEnabled) == nil {
+                return true
+            }
+            return defaults.bool(forKey: Key.streamEnabled)
+        }
+        set { defaults.set(newValue, forKey: Key.streamEnabled) }
+    }
+
     public static var shaderStyle: SyncGramShaderStyle {
         get {
             if let raw = defaults.object(forKey: Key.shaderStyle) as? Int, let style = SyncGramShaderStyle(rawValue: Int32(raw)) {
@@ -126,6 +139,7 @@ public enum SyncGramSettings {
             "backgroundRefresh": self.backgroundRefreshEnabled ? "1" : "0",
             "shader": self.shaderEnabled ? "1" : "0",
             "shaderStyle": String(self.shaderStyle.rawValue),
+            "stream": self.streamEnabled ? "1" : "0",
             "chatListScale": String(self.chatListScale)
         ]
     }
@@ -153,6 +167,9 @@ public enum SyncGramSettings {
         if let value = flag("shader") { self.shaderEnabled = value }
         if let raw = values["shaderStyle"], let value = Int32(raw), let style = SyncGramShaderStyle(rawValue: value) {
             self.shaderStyle = style
+        }
+        if let value = flag("stream") {
+            self.streamEnabled = value
         }
         if let raw = values["chatListScale"], let scale = Double(raw) {
             self.chatListScale = scale
@@ -184,6 +201,8 @@ public enum SyncGramNotificationNames {
     public static let settingsChanged = Notification.Name("SyncGramSettingsChanged")
     public static let backgroundRefreshChanged = Notification.Name("SyncGramBackgroundRefreshChanged")
     public static let shaderChanged = Notification.Name("SyncGramShaderChanged")
+    public static let streamChanged = Notification.Name("SyncGramStreamChanged")
+    public static let streamSelectionChanged = Notification.Name("SyncGramStreamSelectionChanged")
 }
 
 /// Cached chat list scale, so the row layout does not read UserDefaults on every access.

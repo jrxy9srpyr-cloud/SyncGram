@@ -19,6 +19,12 @@ public final class SyncGramStreamSettings {
     }
 
     public func setSelected(_ selected: Bool, accountId: AccountRecordId, peerId: EnginePeer.Id) {
+        self.setSelected(selected, accountId: accountId, peerId: peerId, notify: true)
+    }
+
+    /// Batch-friendly variant used when "select all" changes many peers at once: notify once at
+    /// the end instead of restarting the stream pipeline for every chat.
+    public func setSelected(_ selected: Bool, accountId: AccountRecordId, peerId: EnginePeer.Id, notify: Bool) {
         var values = Set(self.defaults.stringArray(forKey: self.key) ?? [])
         let token = self.token(accountId: accountId, peerId: peerId)
         if selected {
@@ -27,6 +33,13 @@ public final class SyncGramStreamSettings {
             values.remove(token)
         }
         self.defaults.set(Array(values), forKey: self.key)
+        if notify {
+            self.notifySelectionChanged()
+        }
+    }
+
+    public func notifySelectionChanged() {
+        NotificationCenter.default.post(name: SyncGramNotificationNames.streamSelectionChanged, object: nil)
     }
 
     public var hasSelection: Bool {
@@ -35,5 +48,6 @@ public final class SyncGramStreamSettings {
 
     public func clear() {
         self.defaults.removeObject(forKey: self.key)
+        self.notifySelectionChanged()
     }
 }

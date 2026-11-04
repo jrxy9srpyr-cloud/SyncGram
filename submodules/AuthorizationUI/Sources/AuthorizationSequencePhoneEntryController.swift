@@ -176,8 +176,19 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
                         UIPasteboard.general.string = phone
                         lines.append("Номер скопирован в буфер обмена.")
                     }
-                    lines.append("Настройки SyncGram восстановлены. Войдите по коду из Telegram.")
-                    self.presentSessionAlert(title: "Файл сессии открыт", message: lines.joined(separator: "\n"))
+                    let settingsOnlyMessage = lines.joined(separator: "\n") + "\nВ файле нет ключей сессии — восстановлены только настройки. Войдите по коду из Telegram."
+                    let _ = (syncGramImportSession(snapshot: snapshot, accountManager: self.sharedContext.accountManager)
+                    |> deliverOnMainQueue).start(next: { [weak self] result in
+                        guard let self else {
+                            return
+                        }
+                        switch result {
+                        case let .created(accountId), let .existing(accountId):
+                            self.sharedContext.switchToAccount(id: accountId, fromSettingsController: nil, withChatListController: nil)
+                        case .missingBackupData:
+                            self.presentSessionAlert(title: "Файл сессии открыт", message: settingsOnlyMessage)
+                        }
+                    })
                 case .failure:
                     self.presentSessionAlert(title: "Ошибка", message: "Неверный ответ или файл повреждён.")
                 }

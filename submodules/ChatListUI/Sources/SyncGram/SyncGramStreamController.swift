@@ -7,15 +7,20 @@ import Postbox
 import TelegramPresentationData
 import SyncGramUI
 import AccountContext
+import AvatarNode
 
 private struct SyncGramStreamItem {
     let accountId: AccountRecordId
+    let accountContext: AccountContext
     let accountTitle: String
     let chatTitle: String
+    let authorName: String
+    let authorPeer: EnginePeer?
     let text: String
     let timestamp: Int32
     let peerId: EnginePeer.Id
     let messageId: EngineMessage.Id
+    let threadId: Int64?
     let isOutgoing: Bool
     let isDeleted: Bool
 }
@@ -25,25 +30,85 @@ private enum SyncGramStreamEntry {
     case message(SyncGramStreamItem)
 }
 
-/// A single chat bubble in the aggregated "Поток" conversation.
-///
-/// The old implementation mixed `UIStackView` with manually positioned labels inside a
-/// `UIControl`; because the bubble had no explicit height the stack could lay several rows on top
-/// of each other. Everything here is measured and placed by hand in `layout(in:)`, so the height
-/// that is returned is exactly the height that is used by the caller.
+private func syncGramStreamMediaText(_ message: EngineMessage) -> String {
+    guard let media = message.media.first else {
+        return ""
+    }
+    if media is TelegramMediaImage {
+        return "📷 Фото"
+    }
+    if let file = media as? TelegramMediaFile {
+        if file.isVoice {
+            return "🎤 Голосовое сообщение"
+        }
+        if file.isMusic {
+            return "🎵 Аудио"
+        }
+        if file.isVideo {
+            return "🎬 Видео"
+        }
+        if file.isAnimated {
+            return "🎞 GIF"
+        }
+        if file.isSticker {
+            return "🧩 Стикер"
+        }
+        if let fileName = file.fileName, !fileName.isEmpty {
+            return "📎 \(fileName)"
+        }
+        return "📎 Файл"
+    }
+    if media is TelegramMediaMap {
+        return "📍 Геопозиция"
+    }
+    if media is TelegramMediaContact {
+        return "👤 Контакт"
+    }
+    if let poll = media as? TelegramMediaPoll {
+        return "📊 Опрос: \(poll.text)"
+    }
+    if media is TelegramMediaWebpage {
+        return "🔗 Ссылка"
+    }
+    if media is TelegramMediaGame {
+        return "🎮 Игра"
+    }
+    if media is TelegramMediaAction {
+        return ""
+    }
+    return "📎 Вложение"
+}
+
+/// A single chat bubble in the aggregated "Поток" conversation. Laid out by hand so the author,
+/// context, message, time and the optional avatar can never overlap one another.
 private final class SyncGramStreamMessageView: UIControl {
     private let bubbleView = UIView()
+    private let avatarNode: AvatarNode?
     private let authorLabel = UILabel()
+    private let contextLabel = UILabel()
     private let textLabel = UILabel()
     private let timeLabel = UILabel()
     private let trashView = UIImageView()
 
     let item: SyncGramStreamItem
     private let incoming: Bool
+    private let contextText: String
 
     init(item: SyncGramStreamItem, theme: PresentationTheme) {
         self.item = item
         self.incoming = !item.isOutgoing
+
+        let contextParts = [item.chatTitle, item.accountTitle].filter { !$0.isEmpty }
+        self.contextText = (contextParts.isEmpty ? "" : contextParts.joined(separator: " · ")) + (item.threadId != nil ? " · тема" : "")
+
+        let avatarNode: AvatarNode?
+        if let peer = item.authorPeer {
+            avatarNode = AvatarNode(font: avatarPlaceholderFont(size: 12.0))
+            avatarNode?.setPeer(context: item.accountContext, theme: theme, peer: peer, synchronousLoad: true, displayDimensions: CGSize(width: 34.0, height: 34.0))
+        } else {
+            avatarNode = nil
+        }
+        self.avatarNode = avatarNode
 
         super.init(frame: .zero)
 
@@ -56,12 +121,23 @@ private final class SyncGramStreamMessageView: UIControl {
             : [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner]
         self.addSubview(self.bubbleView)
 
-        self.authorLabel.text = item.accountTitle.isEmpty ? item.chatTitle : "\(item.chatTitle) · \(item.accountTitle)"
-        self.authorLabel.font = Font.semibold(12.0)
+        if let avatarNode = avatarNode {
+            self.addSubview(avatarNode.view)
+        }
+
+        self.authorLabel.text = item.authorName
+        self.authorLabel.font = Font.semibold(13.0)
         self.authorLabel.textColor = colors.accentTextColor
         self.authorLabel.numberOfLines = 1
         self.authorLabel.lineBreakMode = .byTruncatingTail
         self.bubbleView.addSubview(self.authorLabel)
+
+        self.contextLabel.text = self.contextText
+        self.contextLabel.font = Font.regular(11.0)
+        self.contextLabel.textColor = colors.secondaryTextColor
+        self.contextLabel.numberOfLines = 1
+        self.contextLabel.lineBreakMode = .byTruncatingTail
+        self.bubbleView.addSubview(self.contextLabel)
 
         self.textLabel.text = item.text
         self.textLabel.font = Font.regular(15.0)
@@ -94,35 +170,51 @@ private final class SyncGramStreamMessageView: UIControl {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// Lays the bubble out inside `width` and returns the total row height, including the vertical
-    /// gap that separates it from the next message.
+    /// Lays the row out inside `width` and returns the exact total height used by the scroll view.
     func layout(in width: CGFloat) -> CGFloat {
-        let sideInset: CGFloat = 12.0
+        let sideInset: CGFloat = 10.0
+        let avatarSize: CGFloat = 34.0
+        let avatarGap: CGFloat = 6.0
         let bubbleInsets = UIEdgeInsets(top: 7.0, left: 11.0, bottom: 6.0, right: 11.0)
-        let maximumBubbleWidth = max(120.0, min(width - 32.0, 460.0))
+        let hasAvatar = self.avatarNode != nil
+        let spaceForAvatar = hasAvatar ? avatarSize + avatarGap : 0.0
+        let maximumBubbleWidth = max(160.0, min(width - sideInset * 2.0 - spaceForAvatar - 8.0, 460.0))
         let maximumContentWidth = maximumBubbleWidth - bubbleInsets.left - bubbleInsets.right
 
         let authorHeight = self.authorLabel.sizeThatFits(CGSize(width: maximumContentWidth, height: .greatestFiniteMagnitude)).height
+        let contextHeight = self.contextLabel.sizeThatFits(CGSize(width: maximumContentWidth, height: .greatestFiniteMagnitude)).height
 
         let trashWidth: CGFloat = self.item.isDeleted ? 14.0 : 0.0
         let timeSize = self.timeLabel.sizeThatFits(CGSize(width: maximumContentWidth, height: .greatestFiniteMagnitude))
         let measuredTextWidth = min(maximumContentWidth, ceil(self.textLabel.intrinsicContentSize.width))
         let measuredAuthorWidth = min(maximumContentWidth, ceil(self.authorLabel.intrinsicContentSize.width))
         let desiredContentWidth = max(measuredTextWidth, measuredAuthorWidth, timeSize.width + trashWidth + 4.0)
-        let contentWidth = max(80.0, min(maximumContentWidth, desiredContentWidth))
+        let contentWidth = max(120.0, min(maximumContentWidth, desiredContentWidth))
 
         let textHeight = self.textLabel.sizeThatFits(CGSize(width: contentWidth, height: .greatestFiniteMagnitude)).height
         let footerHeight = max(timeSize.height, 12.0)
 
         let bubbleWidth = contentWidth + bubbleInsets.left + bubbleInsets.right
-        let bubbleHeight = bubbleInsets.top + authorHeight + 3.0 + textHeight + 4.0 + footerHeight + bubbleInsets.bottom
+        let bubbleHeight = bubbleInsets.top + authorHeight + 1.0 + contextHeight + 3.0 + textHeight + 4.0 + footerHeight + bubbleInsets.bottom
 
-        let bubbleX = self.incoming ? sideInset : max(sideInset, width - sideInset - bubbleWidth)
+        let bubbleX: CGFloat
+        if self.incoming {
+            bubbleX = sideInset + spaceForAvatar
+        } else {
+            bubbleX = max(sideInset, width - sideInset - spaceForAvatar - bubbleWidth)
+        }
+        if let avatarNode = self.avatarNode {
+            let avatarX: CGFloat = self.incoming ? sideInset : width - sideInset - avatarSize
+            avatarNode.frame = CGRect(x: avatarX, y: 2.0, width: avatarSize, height: avatarSize)
+            avatarNode.updateSize(size: CGSize(width: avatarSize, height: avatarSize))
+        }
+
         self.bubbleView.frame = CGRect(x: bubbleX, y: 2.0, width: bubbleWidth, height: bubbleHeight)
 
         let contentX = bubbleInsets.left
         self.authorLabel.frame = CGRect(x: contentX, y: bubbleInsets.top, width: contentWidth, height: authorHeight)
-        self.textLabel.frame = CGRect(x: contentX, y: self.authorLabel.frame.maxY + 3.0, width: contentWidth, height: textHeight)
+        self.contextLabel.frame = CGRect(x: contentX, y: self.authorLabel.frame.maxY + 1.0, width: contentWidth, height: contextHeight)
+        self.textLabel.frame = CGRect(x: contentX, y: self.contextLabel.frame.maxY + 3.0, width: contentWidth, height: textHeight)
 
         let footerY = self.textLabel.frame.maxY + 4.0
         let timeWidth = timeSize.width
@@ -187,6 +279,9 @@ public final class SyncGramStreamController: ViewController {
     private let emptyLabel = UILabel()
 
     private let disposable = MetaDisposable()
+    private let revision = ValuePromise<Int>(0, ignoreRepeated: false)
+    private var revisionValue = 0
+    private var selectionObserver: NSObjectProtocol?
     private var entryViews: [UIView] = []
     private var currentItems: [SyncGramStreamItem] = []
     private var pendingScrollOffset: CGPoint?
@@ -206,6 +301,9 @@ public final class SyncGramStreamController: ViewController {
 
     deinit {
         self.disposable.dispose()
+        if let observer = self.selectionObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     override public func viewDidLoad() {
@@ -274,11 +372,25 @@ public final class SyncGramStreamController: ViewController {
         self.emptyLabel.isHidden = true
         self.view.addSubview(self.emptyLabel)
 
-        let signal = self.context.sharedContext.activeAccountContexts
-        |> mapToSignal { _, accounts, _ -> Signal<[SyncGramStreamItem], NoError> in
+        // Refresh as soon as chats are selected or deselected in the picker, so coming back to the
+        // stream does not require reopening it several times.
+        self.selectionObserver = NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.streamSelectionChanged, object: nil, queue: .main, using: { [weak self] _ in
+            guard let self else {
+                return
+            }
+            self.revisionValue += 1
+            self.revision.set(self.revisionValue)
+        })
+
+        let signal = combineLatest(queue: .mainQueue(),
+            self.context.sharedContext.activeAccountContexts,
+            self.revision.get()
+        )
+        |> mapToSignal { activeAccounts, _ -> Signal<[SyncGramStreamItem], NoError> in
+            let accounts = activeAccounts.1
             let signals: [Signal<[SyncGramStreamItem], NoError>] = accounts.map { accountId, accountContext, _ in
                 let peerSignal = accountContext.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: accountContext.account.peerId))
-                let listSignal = accountContext.account.viewTracker.tailChatListView(groupId: .root, count: 80)
+                let listSignal = accountContext.account.viewTracker.tailChatListView(groupId: .root, count: 100)
                 return combineLatest(queue: .mainQueue(), peerSignal, listSignal)
                 |> map { peer, view -> [SyncGramStreamItem] in
                     let data = accountContext.sharedContext.currentPresentationData.with { $0 }
@@ -286,16 +398,29 @@ public final class SyncGramStreamController: ViewController {
                     var result: [SyncGramStreamItem] = []
                     for entry in view.0.entries {
                         guard case let .MessageEntry(entryData) = entry, let message = entryData.messages.first else { continue }
-                        let chatTitle = entryData.renderedPeer.peer.flatMap(EnginePeer.init)?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? "Чат"
-                        let text = message.text.isEmpty ? "[медиа]" : message.text
+                        let chatPeer = entryData.renderedPeer.peer.flatMap(EnginePeer.init)
+                        let chatTitle = chatPeer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? "Чат"
+                        let authorPeer = message.author ?? chatPeer
+                        let authorName = authorPeer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? chatTitle
+                        let mediaText = syncGramStreamMediaText(message)
+                        let text: String
+                        if !message.text.isEmpty {
+                            text = mediaText.isEmpty ? message.text : mediaText + "\n" + message.text
+                        } else {
+                            text = mediaText.isEmpty ? "[сообщение]" : mediaText
+                        }
                         result.append(SyncGramStreamItem(
                             accountId: accountId,
+                            accountContext: accountContext,
                             accountTitle: accountTitle,
                             chatTitle: chatTitle,
+                            authorName: authorName,
+                            authorPeer: authorPeer,
                             text: text,
                             timestamp: message.timestamp,
                             peerId: message.id.peerId,
                             messageId: message.id,
+                            threadId: message.threadId,
                             isOutgoing: !message.flags.contains(.Incoming),
                             isDeleted: message.isSyncGramDeleted
                         ))
@@ -313,6 +438,13 @@ public final class SyncGramStreamController: ViewController {
         self.disposable.set(signal.start(next: { [weak self] items in
             self?.update(items)
         }))
+    }
+
+    override public func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+
+        self.revisionValue += 1
+        self.revision.set(self.revisionValue)
     }
 
     private func update(_ items: [SyncGramStreamItem]) {
@@ -384,7 +516,21 @@ public final class SyncGramStreamController: ViewController {
             return
         }
         let item = sender.item
-        self.context.sharedContext.navigateToChat(accountId: item.accountId, peerId: item.peerId, messageId: item.messageId)
+        if let threadId = item.threadId, let navigationController = self.navigationController as? NavigationController {
+            let _ = self.context.sharedContext.navigateToForumThread(
+                context: item.accountContext,
+                peerId: item.peerId,
+                threadId: threadId,
+                messageId: item.messageId,
+                navigationController: navigationController,
+                activateInput: nil,
+                scrollToEndIfExists: false,
+                keepStack: .always,
+                animated: true
+            ).start()
+        } else {
+            self.context.sharedContext.navigateToChat(accountId: item.accountId, peerId: item.peerId, messageId: item.messageId)
+        }
     }
 
     @objc private func optionsTapped() {

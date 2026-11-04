@@ -1,10 +1,10 @@
 import Foundation
 import CryptoKit
 
-/// Plain snapshot of the local account metadata plus SyncGram settings. It never contains the
-/// Telegram auth key material itself: iOS keeps that inside the encrypted account database and
-/// there is no public API to read it, so the exported file is a portable SyncGram backup, not a
-/// way to bypass the Telegram login code.
+/// Snapshot of a full SyncGram session: account metadata, the Telegram datacenter auth keys and
+/// SyncGram settings. The auth keys come from `accountBackupData(postbox:)`, the same data Telegram
+/// uses for device-to-device account transfer, so importing the file signs the user back into the
+/// account instead of restoring only the cosmetic settings.
 public struct SyncGramSessionSnapshot: Codable {
     public var version: Int
     public var createdAt: Double
@@ -15,8 +15,9 @@ public struct SyncGramSessionSnapshot: Codable {
     public var username: String?
     public var phone: String?
     public var settings: [String: String]
+    public var backupData: AccountBackupData?
 
-    public init(version: Int = 1, createdAt: Double = Date().timeIntervalSince1970, accountRecordId: Int64, peerId: Int64, authKeyId: Int64, accountTitle: String, username: String?, phone: String?, settings: [String: String]) {
+    public init(version: Int = 1, createdAt: Double = Date().timeIntervalSince1970, accountRecordId: Int64, peerId: Int64, authKeyId: Int64, accountTitle: String, username: String?, phone: String?, settings: [String: String], backupData: AccountBackupData? = nil) {
         self.version = version
         self.createdAt = createdAt
         self.accountRecordId = accountRecordId
@@ -26,6 +27,7 @@ public struct SyncGramSessionSnapshot: Codable {
         self.username = username
         self.phone = phone
         self.settings = settings
+        self.backupData = backupData
     }
 }
 

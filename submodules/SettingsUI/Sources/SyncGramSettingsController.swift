@@ -9,6 +9,7 @@ import AccountContext
 
 private enum SyncGramSettingsToggle: Int32 {
     case shader
+    case stream
     case ghostMode
     case hideOnline
     case hideReads
@@ -59,6 +60,7 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
     case appearanceHeader
     case shader(Bool)
     case shaderStyle(String)
+    case stream(Bool)
     case chatListSize(String)
 
     case privacyHeader
@@ -91,7 +93,7 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
 
     var section: ItemListSectionId {
         switch self {
-        case .appearanceHeader, .shader, .shaderStyle, .chatListSize:
+        case .appearanceHeader, .shader, .shaderStyle, .stream, .chatListSize:
             return SyncGramSettingsSection.appearance.rawValue
         case .privacyHeader, .ghostMode, .hideOnline, .hideReads, .hideTyping, .hideStories, .copyProtection, .hideAds, .screenshots, .flipToHide, .blockedChats:
             return SyncGramSettingsSection.privacy.rawValue
@@ -114,59 +116,61 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return 1
         case .shaderStyle:
             return 2
-        case .chatListSize:
+        case .stream:
             return 3
+        case .chatListSize:
+            return 4
 
         case .privacyHeader:
-            return 4
-        case .ghostMode:
             return 5
-        case .hideOnline:
+        case .ghostMode:
             return 6
-        case .hideReads:
+        case .hideOnline:
             return 7
-        case .hideTyping:
+        case .hideReads:
             return 8
-        case .hideStories:
+        case .hideTyping:
             return 9
-        case .copyProtection:
+        case .hideStories:
             return 10
-        case .hideAds:
+        case .copyProtection:
             return 11
-        case .screenshots:
+        case .hideAds:
             return 12
-        case .flipToHide:
+        case .screenshots:
             return 13
-        case .blockedChats:
+        case .flipToHide:
             return 14
+        case .blockedChats:
+            return 15
 
         case .notificationsHeader:
-            return 15
-        case .backgroundRefresh:
             return 16
+        case .backgroundRefresh:
+            return 17
 
         case .dataHeader:
-            return 17
-        case .accounts:
             return 18
-        case .cache:
+        case .accounts:
             return 19
-        case .session:
+        case .cache:
             return 20
-        case .securityQuestion:
+        case .session:
             return 21
-        case .navigation:
+        case .securityQuestion:
             return 22
-        case .signingInfo:
+        case .navigation:
             return 23
+        case .signingInfo:
+            return 24
 
         case .actionsHeader:
-            return 24
-        case .readAll:
             return 25
+        case .readAll:
+            return 26
 
         case .footer:
-            return 26
+            return 27
         }
     }
 
@@ -180,12 +184,16 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
         case .appearanceHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "Внешний вид", sectionId: self.section)
         case let .shader(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Живой фон", text: "Анимированный узор за списком чатов, в чатах и в настройках. Работает локально и почти не расходует батарею.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Живой фон", text: "Анимированный узор за списком чатов, в чатах и в настройках. Работает локально и почти не расходует батарею.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.shader, value)
             })
         case let .shaderStyle(value):
             return ItemListDisclosureItem(presentationData: presentationData, title: "Стиль фона", enabled: SyncGramSettings.shaderEnabled, label: value, sectionId: self.section, style: .blocks, action: {
                 arguments.openShaderStyle()
+            })
+        case let .stream(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Показывать «Поток»", text: "Строка «Поток» в начале списка чатов. Если выключить, лента перестанет появляться в списке.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.stream, value)
             })
         case let .chatListSize(value):
             return ItemListDisclosureItem(presentationData: presentationData, title: "Размер списка чатов", label: value, sectionId: self.section, style: .blocks, action: {
@@ -195,50 +203,50 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
         case .privacyHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "Приватность", sectionId: self.section)
         case let .ghostMode(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Хранить удалённые сообщения", text: "Сохраняет удалённые сообщения локально и помечает их.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Хранить удалённые сообщения", text: "Сохраняет удалённые сообщения локально и помечает их.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.ghostMode, value)
             })
         case let .hideOnline(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не показывать «онлайн»", text: "Не отправляет собеседникам статус «онлайн».", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Не показывать «онлайн»", text: "Не отправляет собеседникам статус «онлайн».", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideOnline, value)
             })
         case let .hideReads(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не отправлять прочтение", text: "Сообщения остаются непрочитанными для собеседника.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Не отправлять прочтение", text: "Сообщения остаются непрочитанными для собеседника.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideReads, value)
             })
         case let .hideTyping(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не показывать набор текста", text: "Скрывает «печатает…» и выбор стикеров.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Не показывать набор текста", text: "Скрывает «печатает…» и выбор стикеров.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideTyping, value)
             })
         case let .hideStories(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не отмечать просмотр Stories", text: "Не отправляет отметку о просмотре Stories.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Не отмечать просмотр Stories", text: "Не отправляет отметку о просмотре Stories.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideStories, value)
             })
         case let .copyProtection(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Обход защиты от копирования", text: "Разрешает пересылку и сохранение защищённого контента.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Обход защиты от копирования", text: "Разрешает пересылку и сохранение защищённого контента.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.copyProtection, value)
             })
         case let .hideAds(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Отключение рекламы", text: "Скрывает рекламные сообщения Telegram.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Отключение рекламы", text: "Скрывает рекламные сообщения Telegram.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideAds, value)
             })
         case let .screenshots(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Скриншоты в секретных чатах", text: "Не блокирует экран и не отправляет уведомление о скриншоте.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Скриншоты в секретных чатах", text: "Не блокирует экран и не отправляет уведомление о скриншоте.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.screenshots, value)
             })
         case let .flipToHide(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Скрывать экран при перевороте", text: "Прячет имена, аватары и сообщения, когда телефон лежит экраном вниз.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Скрывать экран при перевороте", text: "Прячет имена, аватары и сообщения, когда телефон лежит экраном вниз.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.flipToHide, value)
             })
         case let .blockedChats(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Сохранять чаты после блокировки", text: "Оставляет чат доступным после блокировки или бана.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Сохранять чаты после блокировки", text: "Оставляет чат доступным после блокировки или бана.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.blockedChats, value)
             })
 
         case .notificationsHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "Уведомления", sectionId: self.section)
         case let .backgroundRefresh(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Уведомления в фоне", text: "Иногда проверяет новые сообщения, когда приложение свёрнуто, и показывает локальное уведомление. iOS решает когда; работает без сервера.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .legacy, title: "Уведомления в фоне", text: "Иногда проверяет новые сообщения, когда приложение свёрнуто, и показывает локальное уведомление. iOS решает когда; работает без сервера.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.backgroundRefresh, value)
             })
 
@@ -295,6 +303,7 @@ private func syncGramSettingsEntries(signingInfoText: String) -> [SyncGramSettin
         .appearanceHeader,
         .shader(SyncGramSettings.shaderEnabled),
         .shaderStyle(SyncGramSettings.shaderStyle.title),
+        .stream(SyncGramSettings.streamEnabled),
         .chatListSize("\(Int(round(SyncGramSettings.chatListScale * 100.0)))%"),
 
         .privacyHeader,
@@ -352,6 +361,9 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
         case .shader:
             SyncGramSettings.shaderEnabled = value
             NotificationCenter.default.post(name: SyncGramNotificationNames.shaderChanged, object: nil)
+        case .stream:
+            SyncGramSettings.streamEnabled = value
+            NotificationCenter.default.post(name: SyncGramNotificationNames.streamChanged, object: nil)
         case .ghostMode:
             SyncGramSettings.ghostModeEnabled = value
         case .hideOnline:
@@ -409,9 +421,6 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     )
     |> deliverOnMainQueue
     |> map { presentationData, _ -> (ItemListControllerState, (ItemListNodeState, Any)) in
-        var presentationData = presentationData
-        presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
-
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text("SyncGram"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: syncGramSettingsEntries(), style: .blocks, animateChanges: true)
 

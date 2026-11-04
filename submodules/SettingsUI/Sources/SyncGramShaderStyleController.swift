@@ -49,7 +49,7 @@ private enum SyncGramShaderStyleEntry: ItemListNodeEntry {
         case .header:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "Стиль фона", sectionId: self.section)
         case let .style(style, checked):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: syncGramShaderStyleSwatch(style), iconSize: CGSize(width: 28.0, height: 28.0), title: style.title, subtitle: style.subtitle, style: .left, checked: checked, zeroSeparatorInsets: false, sectionId: self.section, action: {
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .legacy, icon: syncGramShaderStyleSwatch(style), iconSize: CGSize(width: 28.0, height: 28.0), title: style.title, subtitle: style.subtitle, style: .left, checked: checked, zeroSeparatorInsets: false, sectionId: self.section, action: {
                 arguments.select(style)
             })
         case .footer:
@@ -121,9 +121,6 @@ public func syncGramShaderStyleController(context: AccountContext) -> ViewContro
     )
     |> deliverOnMainQueue
     |> map { presentationData, _ -> (ItemListControllerState, (ItemListNodeState, Any)) in
-        var presentationData = presentationData
-        presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
-
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text("Стиль фона"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: syncGramShaderStyleEntries(), style: .blocks, animateChanges: true)
 

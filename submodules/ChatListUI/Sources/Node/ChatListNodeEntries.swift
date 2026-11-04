@@ -989,7 +989,7 @@ func chatListNodeEntriesForView(view: EngineChatList, state: ChatListNodeState, 
         }
     }
 
-    if isMainTab, case .chatList = mode {
+    if isMainTab, case .chatList = mode, SyncGramSettings.streamEnabled {
         // A local, server-less chat that aggregates the selected chats. It is appended last because
         // the entries array is stored bottom-to-top, so this puts it at the very top of the list.
         result.append(.PeerEntry(ChatListNodeEntry.PeerEntryData(

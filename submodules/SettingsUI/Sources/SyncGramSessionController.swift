@@ -70,7 +70,7 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
         self.titleLabel.textColor = theme.list.itemPrimaryTextColor
         self.scrollView.addSubview(self.titleLabel)
 
-        self.descriptionLabel.text = "Сохраняет данные аккаунта и настройки SyncGram в зашифрованный файл. Файл можно импортировать после входа на другом устройстве."
+        self.descriptionLabel.text = "Сохраняет полную сессию аккаунта — включая ключи Telegram — и настройки SyncGram в зашифрованный файл. При импорте аккаунт входит автоматически, без кода из Telegram."
         self.descriptionLabel.font = Font.regular(14.0)
         self.descriptionLabel.textColor = theme.list.itemSecondaryTextColor
         self.descriptionLabel.numberOfLines = 0
@@ -200,10 +200,11 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
 
         let peerSignal = self.context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: self.context.account.peerId))
         let keySignal = self.context.account.network.getAuthKeyId()
+        let backupSignal = accountBackupData(postbox: self.context.account.postbox)
 
-        let _ = (combineLatest(queue: .mainQueue(), peerSignal, keySignal)
+        let _ = (combineLatest(queue: .mainQueue(), peerSignal, keySignal, backupSignal)
         |> take(1)
-        |> deliverOnMainQueue).start(next: { [weak self] peer, authKeyId in
+        |> deliverOnMainQueue).start(next: { [weak self] peer, authKeyId, backupData in
             guard let self else {
                 return
             }
@@ -224,7 +225,8 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
                 accountTitle: title,
                 username: username,
                 phone: phone,
-                settings: SyncGramSettings.sessionSnapshot()
+                settings: SyncGramSettings.sessionSnapshot(),
+                backupData: backupData
             )
 
             DispatchQueue.global(qos: .userInitiated).async {
@@ -357,11 +359,25 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
         formatter.timeStyle = .short
         let created = formatter.string(from: Date(timeIntervalSince1970: snapshot.createdAt))
         let username = snapshot.username.map { "@\($0)" } ?? "—"
-        self.statusLabel.text = "Импортировано: \(snapshot.accountTitle) (\(username)). Файл создан \(created). Настройки SyncGram восстановлены."
 
         self.answerField.text = nil
         self.questionField.text = question
-        SyncGramToast.show("Сессия «\(snapshot.accountTitle)» импортирована")
+
+        let _ = (syncGramImportSession(snapshot: snapshot, accountManager: self.context.sharedContext.accountManager)
+        |> deliverOnMainQueue).start(next: { [weak self] result in
+            guard let self else {
+                return
+            }
+            switch result {
+            case let .created(accountId), let .existing(accountId):
+                self.statusLabel.text = "Импортировано: \(snapshot.accountTitle) (\(username)). Файл создан \(created). Входим в аккаунт по сохранённой сессии…"
+                SyncGramToast.show("Сессия «\(snapshot.accountTitle)» импортирована")
+                self.context.sharedContext.switchToAccount(id: accountId, fromSettingsController: nil, withChatListController: nil)
+            case .missingBackupData:
+                self.statusLabel.text = "Импортировано: \(snapshot.accountTitle) (\(username)). Файл создан \(created). В файле нет ключей сессии — восстановлены только настройки SyncGram, войдите по коду из Telegram."
+                SyncGramToast.show("Настройки SyncGram импортированы")
+            }
+        })
     }
 
     // MARK: - Helpers
