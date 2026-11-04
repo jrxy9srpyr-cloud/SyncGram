@@ -26,7 +26,6 @@ private enum SyncGramSettingsToggle: Int32 {
 private final class SyncGramSettingsControllerArguments {
     let toggle: (SyncGramSettingsToggle, Bool) -> Void
     let openChatListSize: () -> Void
-    let openLocalPremium: () -> Void
     let openSecurityQuestion: () -> Void
     let openNavigation: () -> Void
     let openAccounts: () -> Void
@@ -34,10 +33,9 @@ private final class SyncGramSettingsControllerArguments {
     let openStream: () -> Void
     let readAllChats: () -> Void
 
-    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openLocalPremium: @escaping () -> Void, openSecurityQuestion: @escaping () -> Void, openNavigation: @escaping () -> Void, openAccounts: @escaping () -> Void, openCache: @escaping () -> Void, openStream: @escaping () -> Void, readAllChats: @escaping () -> Void) {
+    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openSecurityQuestion: @escaping () -> Void, openNavigation: @escaping () -> Void, openAccounts: @escaping () -> Void, openCache: @escaping () -> Void, openStream: @escaping () -> Void, readAllChats: @escaping () -> Void) {
         self.toggle = toggle
         self.openChatListSize = openChatListSize
-        self.openLocalPremium = openLocalPremium
         self.openSecurityQuestion = openSecurityQuestion
         self.openNavigation = openNavigation
         self.openAccounts = openAccounts
@@ -68,7 +66,6 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
     case signingNotifications(Bool)
     case signingInfo(String)
     case chatListSize(String)
-    case localPremium
     case securityQuestion(String)
     case navigation
     case accounts
@@ -115,22 +112,20 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return 14
         case .chatListSize:
             return 15
-        case .localPremium:
-            return 16
         case .securityQuestion:
-            return 17
+            return 16
         case .navigation:
-            return 18
+            return 17
         case .accounts:
-            return 19
+            return 18
         case .cache:
-            return 20
+            return 19
         case .stream:
-            return 21
+            return 20
         case .readAll:
-            return 22
+            return 21
         case .footer:
-            return 23
+            return 22
         }
     }
 
@@ -201,10 +196,6 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListDisclosureItem(presentationData: presentationData, title: "Размер списка чатов", label: value, sectionId: self.section, style: .blocks, action: {
                 arguments.openChatListSize()
             })
-        case .localPremium:
-            return ItemListDisclosureItem(presentationData: presentationData, title: "Локальный премиум", label: SyncGramSettings.localPremiumEnabled ? "Активно" : "Не активно", sectionId: self.section, style: .blocks, action: {
-                arguments.openLocalPremium()
-            })
         case let .securityQuestion(value):
             return ItemListDisclosureItem(presentationData: presentationData, title: "Контрольный вопрос", label: value, sectionId: self.section, style: .blocks, action: {
                 arguments.openSecurityQuestion()
@@ -263,7 +254,6 @@ private func syncGramSettingsEntries(signingInfoText: String) -> [SyncGramSettin
         .signingInfo(signingInfoText),
         .signingNotifications(SyncGramSettings.signingNotificationsEnabled),
         .chatListSize("\(Int(round(SyncGramSettings.chatListScale * 100.0)))%"),
-        .localPremium,
         .securityQuestion(SyncGramChatLock.shared.hasSecurityQuestion ? "Задан" : "Не задан"),
         .navigation,
         .accounts,
@@ -313,7 +303,6 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     })
 
     var openChatListSizeImpl: (() -> Void)?
-    var openLocalPremiumImpl: (() -> Void)?
     var openSecurityQuestionImpl: (() -> Void)?
     var openNavigationImpl: (() -> Void)?
     var openAccountsImpl: (() -> Void)?
@@ -355,8 +344,6 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
         revision.set(0)
     }, openChatListSize: {
         openChatListSizeImpl?()
-    }, openLocalPremium: {
-        openLocalPremiumImpl?()
     }, openSecurityQuestion: {
         openSecurityQuestionImpl?()
     }, openNavigation: {
@@ -396,9 +383,6 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     controller.navigationPresentation = .modal
     openChatListSizeImpl = { [weak controller] in
         controller?.push(SyncGramChatListSizeController(context: context))
-    }
-    openLocalPremiumImpl = { [weak controller] in
-        controller?.push(SyncGramLocalPremiumController(context: context))
     }
     openSecurityQuestionImpl = { [weak controller] in
         controller?.push(SyncGramSecurityQuestionController(context: context))
