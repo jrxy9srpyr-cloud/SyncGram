@@ -7792,21 +7792,10 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     // display node reparented and its layout updated, so viewDidAppear never runs for it.
     private func setupScreenCaptureDetectionIfNeeded() {
         if case let .peer(peerId) = self.chatLocation, self.screenCaptureManager == nil {
-            if peerId.namespace == Namespaces.Peer.SecretChat {
-                if !SyncGramSettings.allowSecretScreenshots {
-                    self.screenCaptureManager = ScreenCaptureDetectionManager(check: { [weak self] in
-                        // Returning false keeps the screen-recording poll alive until the chat is actually
-                        // visible in the foreground, so a recording started behind a covering screen or while
-                        // backgrounded is still reported once the chat comes into view.
-                        if let strongSelf = self, strongSelf.isApplicationInForegroundValue, strongSelf.traceVisibility() {
-                            let _ = strongSelf.context.engine.messages.addSecretChatMessageScreenshot(peerId: peerId).startStandalone()
-                            return true
-                        } else {
-                            return false
-                        }
-                    })
-                }
-            } else if peerId.isTelegramNotifications {
+            // SyncGram never reports screenshots or screen recordings to the other side: the
+            // "user took a screenshot" service message is not sent from secret chats at all, which
+            // also covers recording video and opening self-destructing media there.
+            if peerId.isTelegramNotifications {
                 self.screenCaptureManager = ScreenCaptureDetectionManager(check: { [weak self] in
                     if let strongSelf = self, strongSelf.traceVisibility() {
                         let loginCodeRegex = try? NSRegularExpression(pattern: "\\b\\d{5,7}\\b", options: [])
