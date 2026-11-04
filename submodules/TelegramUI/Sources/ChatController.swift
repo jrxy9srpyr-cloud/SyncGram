@@ -10909,7 +10909,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             return
         }
         self.syncGramChatIsLocked = true
-        self.chatDisplayNode.historyNode.canReadHistory.set(false)
+        self.chatDisplayNode.historyNode.canReadHistory.set(.single(false))
         self.chatDisplayNode.dismissInput()
 
         if let overlay = self.syncGramLockOverlay {
