@@ -19,6 +19,15 @@ jobs:
           fetch-depth: 1
           submodules: false
 
+      - name: Restore Bazel cache
+        id: bazel-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /private/var/tmp/_bazel_root
+          key: bazel-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            bazel-${{ runner.os }}-
+
       - name: Fix relative submodule URLs (fork)
         run: |
           sed -i '' 's#url=\.\./rlottie\.git#url=https://github.com/TelegramMessenger/rlottie.git#' .gitmodules
@@ -71,3 +80,11 @@ jobs:
           name: SyncGram-ipa
           path: build/artifacts/*.ipa
           if-no-files-found: warn
+
+      - name: Save Bazel cache
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: /private/var/tmp/_bazel_root
+          key: ${{ steps.bazel-cache.outputs.cache-primary-key }}
