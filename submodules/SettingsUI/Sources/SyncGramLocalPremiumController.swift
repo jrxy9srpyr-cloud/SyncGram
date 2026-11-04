@@ -202,7 +202,7 @@ public final class SyncGramLocalPremiumController: ViewController {
             SyncGramSettings.hideAdsEnabled = previousHideAds
             SyncGramSettings.localPremiumPreviousHideAds = nil
         }
-        NotificationCenter.default.post(name: SyncGramNotifications.settingsChanged, object: nil)
+        NotificationCenter.default.post(name: SyncGramNotificationNames.settingsChanged, object: nil)
         self.updateState()
     }
 

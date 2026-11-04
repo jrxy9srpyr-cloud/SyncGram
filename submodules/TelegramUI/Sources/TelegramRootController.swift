@@ -243,7 +243,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.syncGramShowCallsTab = showCallsTab
         self.syncGramShowNewsTab = showNewsTab
         if self.syncGramNavigationObserver == nil {
-            self.syncGramNavigationObserver = NotificationCenter.default.addObserver(forName: SyncGramNotifications.navigationChanged, object: nil, queue: .main, using: { [weak self] _ in
+            self.syncGramNavigationObserver = NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.navigationChanged, object: nil, queue: .main, using: { [weak self] _ in
                 guard let self else {
                     return
                 }

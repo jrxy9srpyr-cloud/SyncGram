@@ -140,8 +140,8 @@ public final class SyncGramChatListSizeController: ViewController {
         SyncGramSettings.chatListScale = Double(self.slider.value)
         self.updateValueLabel()
         self.applyPreviewScale()
-        NotificationCenter.default.post(name: SyncGramNotifications.chatListScaleChanged, object: nil)
-        NotificationCenter.default.post(name: SyncGramNotifications.settingsChanged, object: nil)
+        NotificationCenter.default.post(name: SyncGramNotificationNames.chatListScaleChanged, object: nil)
+        NotificationCenter.default.post(name: SyncGramNotificationNames.settingsChanged, object: nil)
     }
 
     private func updateValueLabel() {

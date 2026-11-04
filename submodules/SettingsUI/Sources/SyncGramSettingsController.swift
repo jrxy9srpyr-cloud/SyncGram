@@ -308,7 +308,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     if let observer = syncGramSettingsChangeObserver {
         NotificationCenter.default.removeObserver(observer)
     }
-    syncGramSettingsChangeObserver = NotificationCenter.default.addObserver(forName: SyncGramNotifications.settingsChanged, object: nil, queue: .main, using: { [weak revision] _ in
+    syncGramSettingsChangeObserver = NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.settingsChanged, object: nil, queue: .main, using: { [weak revision] _ in
         revision?.set(0)
     })
 
@@ -326,7 +326,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             SyncGramSettings.ghostModeEnabled = value
         case .hideOnline:
             SyncGramSettings.hideOnlineStatusEnabled = value
-            NotificationCenter.default.post(name: SyncGramNotifications.hideOnlineChanged, object: nil)
+            NotificationCenter.default.post(name: SyncGramNotificationNames.hideOnlineChanged, object: nil)
         case .hideReads:
             SyncGramSettings.hideReadReceiptsEnabled = value
         case .hideTyping:
@@ -343,7 +343,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             SyncGramSettings.hideAdsEnabled = value
         case .flipToHide:
             SyncGramSettings.flipToHideEnabled = value
-            NotificationCenter.default.post(name: SyncGramNotifications.flipToHideChanged, object: nil)
+            NotificationCenter.default.post(name: SyncGramNotificationNames.flipToHideChanged, object: nil)
         case .backgroundRefresh:
             SyncGramSettings.backgroundRefreshEnabled = value
         case .deletedNotifications:

@@ -1447,7 +1447,7 @@ public final class ChatListNode: ListViewImpl {
         
         // Rebuild the rows as soon as the chat list size changes, so the new size applies
         // immediately instead of only after the next interaction with the list.
-        self.syncGramChatListScaleObserver = NotificationCenter.default.addObserver(forName: SyncGramNotifications.chatListScaleChanged, object: nil, queue: .main, using: { [weak self] _ in
+        self.syncGramChatListScaleObserver = NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.chatListScaleChanged, object: nil, queue: .main, using: { [weak self] _ in
             guard let self else {
                 return
             }

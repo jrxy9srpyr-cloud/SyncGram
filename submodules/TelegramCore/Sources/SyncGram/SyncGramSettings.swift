@@ -142,7 +142,7 @@ public enum SyncGramSettings {
 }
 
 /// Names of the local notifications used to propagate SyncGram setting changes between modules.
-public enum SyncGramNotifications {
+public enum SyncGramNotificationNames {
     public static let hideOnlineChanged = Notification.Name("SyncGramHideOnlineChanged")
     public static let chatListScaleChanged = Notification.Name("SyncGramChatListScaleChanged")
     public static let navigationChanged = Notification.Name("SyncGramNavigationChanged")

@@ -113,7 +113,7 @@ public final class SyncGramNavigationController: ViewController {
         }
         let tab = SyncGramTabId.allCases[sender.tag]
         SyncGramNavigationSettings.shared.setPlacement(Self.placement(for: sender.selectedSegmentIndex), for: tab)
-        NotificationCenter.default.post(name: SyncGramNotifications.navigationChanged, object: nil)
+        NotificationCenter.default.post(name: SyncGramNotificationNames.navigationChanged, object: nil)
     }
 
     override public func viewDidLayoutSubviews() {

@@ -29,7 +29,7 @@ public final class SyncGramPrivacyOverlay {
             self?.update()
         }
         // Turning the feature off must remove an existing blur right away, not on the next flip.
-        self.settingObserver = NotificationCenter.default.addObserver(forName: SyncGramNotifications.flipToHideChanged, object: nil, queue: .main) { [weak self] _ in
+        self.settingObserver = NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.flipToHideChanged, object: nil, queue: .main) { [weak self] _ in
             self?.update()
         }
         self.lastOrientation = UIDevice.current.orientation
