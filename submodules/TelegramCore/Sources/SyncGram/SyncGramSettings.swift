@@ -24,8 +24,16 @@ public enum SyncGramSettings {
         return UserDefaults.standard
     }
 
+    /// Keeps messages that were deleted on the server in the local database and marks them with a
+    /// trash glyph. On by default: keeping deleted messages is one of SyncGram's core features, so
+    /// it works out of the box and can still be turned off in the settings.
     public static var ghostModeEnabled: Bool {
-        get { return defaults.bool(forKey: Key.ghostMode) }
+        get {
+            if defaults.object(forKey: Key.ghostMode) == nil {
+                return true
+            }
+            return defaults.bool(forKey: Key.ghostMode)
+        }
         set { defaults.set(newValue, forKey: Key.ghostMode) }
     }
 

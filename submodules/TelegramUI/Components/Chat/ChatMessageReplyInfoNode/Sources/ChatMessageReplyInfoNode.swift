@@ -681,7 +681,7 @@ public class ChatMessageReplyInfoNode: ASDisplayNode {
                     result.addAttribute(.link, value: "tg://user?id=\(authorId.id)", range: NSRange(location: 0, length: result.length))
                     result.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: NSRange(location: 0, length: result.length))
                 }
-                result.append(NSAttributedString(string: "\nудалённое сообщение", font: textFont, textColor: textColor))
+                result.append(NSAttributedString(string: "\n" + (message.text.isEmpty ? "[медиа]" : message.text), font: textFont, textColor: textColor))
                 messageText = result
             }
 

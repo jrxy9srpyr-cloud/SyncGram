@@ -760,6 +760,7 @@ public final class ChatMessageAttachedContentNode: ASDisplayNode {
                                 context: context,
                                 presentationData: presentationData,
                                 edited: edited && !isPreview,
+                                deleted: message.isSyncGramDeleted && !isPreview,
                                 impressionCount: !isPreview ? viewCount : nil,
                                 dateText: dateText,
                                 type: statusType,

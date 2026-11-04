@@ -1174,6 +1174,7 @@ public class ChatMessageTodoBubbleContentNode: ChatMessageBubbleContentNode {
                         context: item.context,
                         presentationData: item.presentationData,
                         edited: edited,
+                        deleted: item.message.isSyncGramDeleted && !item.presentationData.isPreview,
                         impressionCount: viewCount,
                         dateText: dateText,
                         type: statusType,

@@ -52,6 +52,8 @@ private final class SyncGramAccountRowView {
 
         self.container.backgroundColor = theme.list.itemBlocksBackgroundColor
         self.container.layer.cornerRadius = 12.0
+        // Keep every child inside the card: a long action title must never paint past the tile.
+        self.container.clipsToBounds = true
 
         self.title.font = Font.semibold(17.0)
         self.title.textColor = theme.list.itemPrimaryTextColor
@@ -75,14 +77,30 @@ private final class SyncGramAccountRowView {
 
         self.actions.axis = .horizontal
         self.actions.spacing = 8.0
+        // Fill the card's width instead of hugging the two long button titles: with a
+        // `lessThanOrEqual` trailing constraint the stack could grow past the card edge and the
+        // whole settings tile looked wider than the screen.
+        self.actions.distribution = .fillEqually
+        self.actions.alignment = .center
 
-        self.openButton.setTitle("Открыть непрочитанные", for: .normal)
+        self.openButton.setTitle("Непрочитанные", for: .normal)
         self.openButton.setTitleColor(theme.list.itemAccentColor, for: .normal)
         self.openButton.titleLabel?.font = Font.semibold(13.0)
+        self.openButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        self.openButton.titleLabel?.minimumScaleFactor = 0.7
+        self.openButton.titleLabel?.lineBreakMode = .byTruncatingTail
+        self.openButton.accessibilityLabel = "Открыть непрочитанные"
 
-        self.copyButton.setTitle("Скопировать username", for: .normal)
+        self.copyButton.setTitle("Username", for: .normal)
         self.copyButton.setTitleColor(theme.list.itemAccentColor, for: .normal)
         self.copyButton.titleLabel?.font = Font.regular(13.0)
+        self.copyButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        self.copyButton.titleLabel?.minimumScaleFactor = 0.7
+        self.copyButton.titleLabel?.lineBreakMode = .byTruncatingTail
+        self.copyButton.accessibilityLabel = "Скопировать username"
+
+        self.openButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        self.copyButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         self.actions.addArrangedSubview(self.openButton)
         self.actions.addArrangedSubview(self.copyButton)
@@ -109,7 +127,7 @@ private final class SyncGramAccountRowView {
             self.status.trailingAnchor.constraint(equalTo: self.title.trailingAnchor),
             self.status.topAnchor.constraint(equalTo: self.lastMessage.bottomAnchor, constant: 4.0),
             self.actions.leadingAnchor.constraint(equalTo: self.title.leadingAnchor),
-            self.actions.trailingAnchor.constraint(lessThanOrEqualTo: self.container.trailingAnchor, constant: -14.0),
+            self.actions.trailingAnchor.constraint(equalTo: self.container.trailingAnchor, constant: -14.0),
             self.actions.topAnchor.constraint(equalTo: self.status.bottomAnchor, constant: 8.0),
             self.actions.bottomAnchor.constraint(equalTo: self.container.bottomAnchor, constant: -12.0)
         ])

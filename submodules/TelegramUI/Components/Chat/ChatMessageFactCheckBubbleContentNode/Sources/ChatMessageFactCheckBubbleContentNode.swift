@@ -438,6 +438,7 @@ public class ChatMessageFactCheckBubbleContentNode: ChatMessageBubbleContentNode
                         context: item.context,
                         presentationData: item.presentationData,
                         edited: edited && !item.presentationData.isPreview,
+                        deleted: item.message.isSyncGramDeleted && !item.presentationData.isPreview,
                         impressionCount: !item.presentationData.isPreview ? viewCount : nil,
                         dateText: dateText,
                         type: statusType,

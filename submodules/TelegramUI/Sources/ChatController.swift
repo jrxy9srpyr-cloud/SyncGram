@@ -10832,20 +10832,52 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     }
     
     private func syncGramComposeMessage(text: String, replyMessageSubject: EngineMessageReplySubject?) -> (text: String, attributes: [MessageAttribute], replyMessageSubject: EngineMessageReplySubject?) {
-        var entities = generateTextEntities(text, enabledTypes: .all)
         var messageText = text
         var sendReplyTo = replyMessageSubject
+        var quoteRange: Range<Int>?
+        var authorRange: Range<Int>?
+        var deletedAuthorId: EnginePeer.Id?
+
+        // Telegram removes the quote once the replied-to message is deleted, so the reply would
+        // silently lose its context. Instead we keep the deleted message by embedding its real
+        // text into the outgoing message: a block quote with the author's name, followed by the
+        // reply itself. The server no longer sees a reply subject, so nothing can be stripped.
         if let replyMessage = self.presentationInterfaceState.replyMessage, replyMessage.isSyncGramDeleted {
             let authorName = replyMessage.author.flatMap(EnginePeer.init)?.displayTitle(strings: self.presentationData.strings, displayOrder: self.presentationData.nameDisplayOrder) ?? "Удалённый пользователь"
-            let quoteLine = authorName + "\nудалённое сообщение"
-            messageText = quoteLine + "\n" + text
-            let quoteLength = (quoteLine as NSString).length
-            entities.append(MessageTextEntity(range: 0 ..< quoteLength, type: .BlockQuote(isCollapsed: false)))
-            if let authorId = replyMessage.author?.id {
-                entities.append(MessageTextEntity(range: 0 ..< (authorName as NSString).length, type: .TextUrl(url: "tg://user?id=\(authorId.id)")))
+
+            var deletedText: String
+            if !replyMessage.text.isEmpty {
+                deletedText = replyMessage.text
+            } else if replyMessage.media.contains(where: { $0 is TelegramMediaImage }) {
+                deletedText = "[фото]"
+            } else if replyMessage.media.contains(where: { $0 is TelegramMediaFile }) {
+                deletedText = "[файл]"
+            } else {
+                deletedText = "[медиа]"
             }
+            let maximumQuoteLength = 1000
+            if deletedText.count > maximumQuoteLength {
+                deletedText = String(deletedText.prefix(maximumQuoteLength)) + "…"
+            }
+
+            let quoteLine = authorName + "\n" + deletedText
+            messageText = quoteLine + "\n" + text
+            quoteRange = 0 ..< (quoteLine as NSString).length
+            authorRange = 0 ..< (authorName as NSString).length
+            deletedAuthorId = replyMessage.author?.id
             sendReplyTo = nil
         }
+
+        // Entities must be generated from the final message: generating them before prepending the
+        // quote would shift every link/formatting range by the length of the inserted block.
+        var entities = generateTextEntities(messageText, enabledTypes: .all)
+        if let quoteRange = quoteRange {
+            entities.append(MessageTextEntity(range: quoteRange, type: .BlockQuote(isCollapsed: false)))
+        }
+        if let authorRange = authorRange, let authorId = deletedAuthorId {
+            entities.append(MessageTextEntity(range: authorRange, type: .TextUrl(url: "tg://user?id=\(authorId.id)")))
+        }
+
         var attributes: [MessageAttribute] = []
         if !entities.isEmpty {
             attributes.append(TextEntitiesMessageAttribute(entities: entities))

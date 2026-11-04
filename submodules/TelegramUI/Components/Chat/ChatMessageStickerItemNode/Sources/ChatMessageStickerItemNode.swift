@@ -629,6 +629,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                 context: item.context,
                 presentationData: item.presentationData,
                 edited: edited,
+                deleted: item.message.isSyncGramDeleted && !item.presentationData.isPreview,
                 impressionCount: viewCount,
                 dateText: dateText,
                 type: statusType,
