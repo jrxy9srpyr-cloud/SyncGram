@@ -12,7 +12,7 @@ public final class SyncGramShaderNode: ASDisplayNode {
     private var cachedBase = UIColor(red: 0.05, green: 0.06, blue: 0.07, alpha: 1.0)
     private var observer: NSObjectProtocol?
 
-    public init() {
+    public override init() {
         super.init()
 
         self.isUserInteractionEnabled = false
