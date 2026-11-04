@@ -398,9 +398,10 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         self.animationNode.setup(source: AnimatedStickerNodeLocalFileSource(name: "IntroPhone"), width: 256, height: 256, playbackMode: .once, mode: .direct(cachePathPrefix: nil))
         self.logoNode = ASImageNode()
         self.logoNode.image = UIImage(bundleImageName: "SyncGramLoginLogo")
-        self.logoNode.contentMode = .scaleAspectFit
+        self.logoNode.contentMode = .scaleAspectFill
         self.logoNode.displaysAsynchronously = false
         self.logoNode.cornerRadius = 22.0
+        self.logoNode.clipsToBounds = true
         
         self.managedAnimationNode = ManagedPhoneAnimationNode(lottieSettings: .noAccountFallback)
         self.managedAnimationNode.isHidden = true
@@ -498,7 +499,6 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         
         self.animationNode.completed = { [weak self] _ in
             self?.animationNode.removeFromSupernode()
-            self?.managedAnimationNode.isHidden = false
         }
     }
     
@@ -533,7 +533,7 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         self.view.insertSubview(textSnapshot, at: 0)
         
         let nodes: [ASDisplayNode] = [
-            self.animationNode,
+            self.logoNode,
             self.titleNode,
             self.noticeNode,
             self.phoneAndCountryNode,
@@ -562,14 +562,14 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         self.textSnapshotView?.layer.animatePosition(from: CGPoint(), to: CGPoint(x: 0.0, y: -140.0), duration: 0.3, timingFunction: kCAMediaTimingFunctionSpring, removeOnCompletion: false, additive: true)
     
         let nodes: [ASDisplayNode] = [
-            self.animationNode,
+            self.logoNode,
             self.titleNode,
             self.noticeNode,
             self.phoneAndCountryNode,
             self.contactSyncNode
         ]
         
-        self.animationNode.layer.animateScale(from: 0.3, to: 1.0, duration: 0.3)
+        self.logoNode.layer.animateScale(from: 0.3, to: 1.0, duration: 0.3)
 
         for node in nodes {
             node.alpha = 1.0
@@ -647,13 +647,15 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         ]
         
         if layout.size.width > 320.0 {
-            items.insert(AuthorizationLayoutItem(node: self.animationNode, size: animationSize, spacingBefore: AuthorizationLayoutItemSpacing(weight: 10.0, maxValue: 10.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)), at: 0)
+            items.insert(AuthorizationLayoutItem(node: self.logoNode, size: animationSize, spacingBefore: AuthorizationLayoutItemSpacing(weight: 10.0, maxValue: 10.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)), at: 0)
             self.proceedNode.isHidden = false
+            self.logoNode.isHidden = false
             self.animationNode.isHidden = true
             self.animationNode.visibility = false
         } else {
             insets.top = navigationBarHeight
             self.proceedNode.isHidden = true
+            self.logoNode.isHidden = true
             self.animationNode.isHidden = true
             self.managedAnimationNode.isHidden = true
         }
@@ -676,16 +678,10 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         transition.updateFrame(node: self.proceedNode, frame: buttonFrame)
         
         self.animationNode.updateLayout(size: animationSize)
-        var logoFrame = self.animationNode.frame
-        if logoFrame.isEmpty || logoFrame.width < 1.0 {
-            let logoSize: CGFloat = 120.0
-            logoFrame = CGRect(x: floor((layout.size.width - logoSize) / 2.0), y: insets.top + 40.0, width: logoSize, height: logoSize)
-        }
-        transition.updateFrame(node: self.logoNode, frame: logoFrame)
         
         let _ = layoutAuthorizationItems(bounds: CGRect(origin: CGPoint(x: bandMinX, y: insets.top), size: CGSize(width: bandWidth, height: layout.size.height - insets.top - insets.bottom - additionalBottomInset)), items: items, transition: transition, failIfDoesNotFit: false)
         
-        transition.updateFrame(node: self.managedAnimationNode, frame: self.animationNode.frame)
+        transition.updateFrame(node: self.managedAnimationNode, frame: self.logoNode.frame)
         
         self.titleActivateAreaNode.frame = self.titleNode.frame
         self.noticeActivateAreaNode.accessibilityLabel = self.noticeNode.attributedText?.string ?? ""

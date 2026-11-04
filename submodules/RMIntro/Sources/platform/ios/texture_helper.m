@@ -12,6 +12,22 @@
 
 GLuint setup_texture(NSString *fileName, UIColor *color)
 {
+    // SyncGram: the Telegram sphere and paper plane are replaced by a static branded logo view
+    // (see RMIntroViewController), so their textures are made fully transparent. Keeping the
+    // textures avoids changing any of the intro animation timing.
+    if ([fileName isEqualToString:@"telegram_sphere.png"] || [fileName isEqualToString:@"telegram_plane1.png"]) {
+        GLubyte pixel[4] = { 0, 0, 0, 0 };
+        GLuint texName = 0;
+        glGenTextures(1, &texName);
+        glBindTexture(GL_TEXTURE_2D, texName);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+        return texName;
+    }
+
     CGImageRef spriteImage = [[UIImage imageNamed:fileName] CGImage];
     if (!spriteImage) {
         NSLog(@"Failed to load image %@", fileName);

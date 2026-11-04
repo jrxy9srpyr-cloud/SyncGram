@@ -307,10 +307,15 @@ typedef enum {
 
         UIImage *syncGramLogo = [UIImage imageNamed:@"SyncGramLoginLogo"];
         if (syncGramLogo != nil) {
-            _syncGramLogoView = [[UIImageView alloc] initWithFrame:_glkView.bounds];
+            CGFloat logoSize = floor(_glkView.bounds.size.width * 0.74);
+            CGRect logoFrame = CGRectMake(floor((_glkView.bounds.size.width - logoSize) / 2.0), floor((_glkView.bounds.size.height - logoSize) / 2.0), logoSize, logoSize);
+            _syncGramLogoView = [[UIImageView alloc] initWithFrame:logoFrame];
             _syncGramLogoView.image = syncGramLogo;
-            _syncGramLogoView.contentMode = UIViewContentModeScaleAspectFit;
-            _syncGramLogoView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            _syncGramLogoView.contentMode = UIViewContentModeScaleAspectFill;
+            _syncGramLogoView.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin;
+            _syncGramLogoView.layer.cornerRadius = floor(logoSize * 0.2237);
+            _syncGramLogoView.layer.cornerCurve = kCACornerCurveContinuous;
+            _syncGramLogoView.clipsToBounds = YES;
             _syncGramLogoView.userInteractionEnabled = NO;
             [_glkView addSubview:_syncGramLogoView];
         }
@@ -331,10 +336,10 @@ typedef enum {
         [EAGLContext setCurrentContext:nil];
 
     _context = nil;
-    [_glkView removeFromSuperview];
-    _glkView = nil;
     [_syncGramLogoView removeFromSuperview];
     _syncGramLogoView = nil;
+    [_glkView removeFromSuperview];
+    _glkView = nil;
     _isOpenGLLoaded = false;
 }
 
@@ -403,10 +408,29 @@ typedef enum {
 }
 
 - (UIView *)createAnimationSnapshot {
-    UIImage *image = _glkView.snapshot;
-    UIImageView *imageView = [[UIImageView alloc] initWithFrame:_glkView.frame];
-    imageView.image = image;
-    return imageView;
+    if (_syncGramLogoView == nil) {
+        UIImage *image = _glkView.snapshot;
+        UIImageView *imageView = [[UIImageView alloc] initWithFrame:_glkView.frame];
+        imageView.image = image;
+        return imageView;
+    }
+    
+    // Compose the snapshot explicitly: the GL view now renders only its background, and the
+    // animated sticker belongs to another screen, so the logo has to be drawn by hand here for
+    // the transition to the phone number entry screen to line up with the intro.
+    UIView *container = [[UIView alloc] initWithFrame:_glkView.frame];
+    container.backgroundColor = _backgroundColor;
+    
+    UIImageView *logoView = [[UIImageView alloc] initWithFrame:_syncGramLogoView.frame];
+    logoView.image = _syncGramLogoView.image;
+    logoView.contentMode = _syncGramLogoView.contentMode;
+    logoView.layer.cornerRadius = _syncGramLogoView.layer.cornerRadius;
+    logoView.layer.cornerCurve = _syncGramLogoView.layer.cornerCurve;
+    logoView.clipsToBounds = YES;
+    logoView.alpha = _syncGramLogoView.alpha;
+    [container addSubview:logoView];
+    
+    return container;
 }
 
 - (UIView *)createTextSnapshot {
@@ -681,6 +705,12 @@ NSInteger _current_page_end;
     CGFloat offset = (scrollView.contentOffset.x - _currentPage * scrollView.frame.size.width) / self.view.frame.size.width;
     
     set_scroll_offset((float)offset);
+    
+    if (_syncGramLogoView != nil) {
+        CGFloat pageOffset = scrollView.contentOffset.x / MAX(1.0, scrollView.frame.size.width);
+        CGFloat logoAlpha = MAX(0.0, MIN(1.0, 1.0 - pageOffset * 2.0));
+        _syncGramLogoView.alpha = logoAlpha;
+    }
     
     if (justEndDragging)
     {
