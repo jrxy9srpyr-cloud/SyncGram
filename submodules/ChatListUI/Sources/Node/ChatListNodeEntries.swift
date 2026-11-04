@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import Postbox
 import TelegramCore
 import TelegramPresentationData
 import MergeLists

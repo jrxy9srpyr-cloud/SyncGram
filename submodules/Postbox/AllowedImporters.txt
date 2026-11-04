@@ -20,6 +20,7 @@ submodules/AvatarNode/Sources/AvatarNode.swift
 submodules/AvatarNode/Sources/PeerAvatar.swift
 submodules/ChatListUI/Sources/ChatListController.swift
 submodules/ChatListUI/Sources/ChatListSearchListPaneNode.swift
+submodules/ChatListUI/Sources/Node/ChatListNodeEntries.swift
 submodules/ChatListUI/Sources/Node/ChatListNodeLocation.swift
 submodules/ChatListUI/Sources/SyncGram/SyncGramStreamChat.swift
 submodules/ChatListUI/Sources/SyncGram/SyncGramStreamChatsController.swift
