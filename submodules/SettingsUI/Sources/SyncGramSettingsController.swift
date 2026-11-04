@@ -368,11 +368,9 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     }, openStream: {
         openStreamImpl?()
     }, readAllChats: {
-        let _ = context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: .root, filterPredicate: nil)]).startStandalone(error: { _ in
-            DispatchQueue.main.async {
-                syncGramPresentReadAllConfirmation(success: false)
-            }
-        }, completed: {
+        // `markAllChatsAsReadInteractively` cannot fail (Signal<Never, NoError>), so only
+        // the completion branch exists.
+        let _ = context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: .root, filterPredicate: nil)]).startStandalone(completed: {
             DispatchQueue.main.async {
                 syncGramPresentReadAllConfirmation(success: true)
             }
