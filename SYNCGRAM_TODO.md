@@ -7,13 +7,13 @@
 - [x] **Убран остаток `anchorPoint`** в `ChatListItem.swift` (ставился только под удалённый `CATransform3DMakeScale`).
 - [x] **Заблокированный чат не помечает прочитанным**: добавлен флаг `syncGramChatIsLocked`, `canReadHistory` выключается до разблокировки, ввод закрывается; после разблокировки восстанавливается.
 - [x] **Локальный премиум: откат `hideAds`** — прежнее значение сохраняется в `SyncGramSettings.localPremiumPreviousHideAds` и восстанавливается при выключении.
-- [x] **Строка «Локальный премиум» обновляется** — `SyncGramNotifications.settingsChanged` + наблюдатель в `syncGramSettingsController` (bump revision).
+- [x] **Строки настроек обновляются** — `SyncGramNotifications.settingsChanged` + наблюдатель в `syncGramSettingsController` (bump revision); отправляется из премиума, размера списка и контрольного вопроса.
 - [x] **Скрытие вкладок «Чаты»/«Настройки» работает** — принудительная вставка уважает `.hidden`; если скрыто всё, остаётся «Чаты».
 - [x] **Flip-to-hide реагирует на настройку** — `SyncGramNotifications.flipToHideChanged`, блюр снимается сразу при выключении.
 
 ## P2
 
-- [x] **Кэш масштаба списка** — `SyncGramChatListMetrics.scale` + `ChatListPresentationData.syncGramScale` (без чтения `UserDefaults` на каждый замер).
+- [x] **Кэш масштаба списка** — `SyncGramChatListMetrics.scale` обновляется в сеттере `chatListScale`; `ChatListPresentationData.syncGramScale` хранит значение экземпляра (без чтения `UserDefaults` на каждый замер).
 - [x] **Масштаб не влияет на превью** — превью темы и выбора размера текста передают `syncGramScale: 1.0`.
 - [x] **`ChatListNode`**: обновление через уведомление о смене размера, экземпляр `ChatListPresentationData` пересоздаётся с текущим масштабом; обсервер снимается в `deinit`.
 - [x] **Карточка замка**: фиксированная ширина 320 (priority high) + `preferredMaxLayoutWidth`, вписывается в узкие экраны.
