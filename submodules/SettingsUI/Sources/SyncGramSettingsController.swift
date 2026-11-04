@@ -274,22 +274,43 @@ private func syncGramSettingsEntries(signingInfoText: String) -> [SyncGramSettin
     ]
 }
 
-private func syncGramPresentReadAllConfirmation() {
-    guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+private func syncGramActiveWindow() -> UIWindow? {
+    let scenes = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+    let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+    guard let scene else {
+        return nil
+    }
+    return scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first
+}
+
+private func syncGramPresentReadAllConfirmation(success: Bool) {
+    guard let window = syncGramActiveWindow() else {
         return
     }
-    let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first
-    var controller = window?.rootViewController
+    var controller = window.rootViewController
     while let presented = controller?.presentedViewController {
         controller = presented
     }
-    let alert = UIAlertController(title: "Готово", message: "Все чаты отмечены как прочитанные.", preferredStyle: .alert)
+    let alert = UIAlertController(
+        title: success ? "Готово" : "Не удалось",
+        message: success ? "Все чаты отмечены как прочитанные." : "Не удалось отметить чаты как прочитанные. Проверьте подключение и попробуйте ещё раз.",
+        preferredStyle: .alert
+    )
     alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
     controller?.present(alert, animated: true, completion: nil)
 }
 
+private var syncGramSettingsChangeObserver: NSObjectProtocol?
+
 public func syncGramSettingsController(context: AccountContext) -> ViewController {
     let revision = ValuePromise<Int>(0, ignoreRepeated: false)
+
+    if let observer = syncGramSettingsChangeObserver {
+        NotificationCenter.default.removeObserver(observer)
+    }
+    syncGramSettingsChangeObserver = NotificationCenter.default.addObserver(forName: SyncGramNotifications.settingsChanged, object: nil, queue: .main, using: { [weak revision] _ in
+        revision?.set(0)
+    })
 
     var openChatListSizeImpl: (() -> Void)?
     var openLocalPremiumImpl: (() -> Void)?
@@ -305,7 +326,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             SyncGramSettings.ghostModeEnabled = value
         case .hideOnline:
             SyncGramSettings.hideOnlineStatusEnabled = value
-            NotificationCenter.default.post(name: Notification.Name("SyncGramHideOnlineChanged"), object: nil)
+            NotificationCenter.default.post(name: SyncGramNotifications.hideOnlineChanged, object: nil)
         case .hideReads:
             SyncGramSettings.hideReadReceiptsEnabled = value
         case .hideTyping:
@@ -322,6 +343,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             SyncGramSettings.hideAdsEnabled = value
         case .flipToHide:
             SyncGramSettings.flipToHideEnabled = value
+            NotificationCenter.default.post(name: SyncGramNotifications.flipToHideChanged, object: nil)
         case .backgroundRefresh:
             SyncGramSettings.backgroundRefreshEnabled = value
         case .deletedNotifications:
@@ -346,9 +368,13 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     }, openStream: {
         openStreamImpl?()
     }, readAllChats: {
-        let _ = context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: .root, filterPredicate: nil)]).startStandalone(completed: {
-            Queue.mainQueue().justDispatch {
-                syncGramPresentReadAllConfirmation()
+        let _ = context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: .root, filterPredicate: nil)]).startStandalone(error: { _ in
+            DispatchQueue.main.async {
+                syncGramPresentReadAllConfirmation(success: false)
+            }
+        }, completed: {
+            DispatchQueue.main.async {
+                syncGramPresentReadAllConfirmation(success: true)
             }
         })
     })

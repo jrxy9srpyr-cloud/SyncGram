@@ -10,6 +10,7 @@ public final class SyncGramChatLock {
         static let lockedPeerIds = "syncgram.chatLock.ids"
         static let securityQuestion = "syncgram.chatLock.question"
         static let securityAnswerHash = "syncgram.chatLock.answerHash"
+        static let securityAnswerSalt = "syncgram.chatLock.answerSalt"
     }
 
     private let defaults = UserDefaults.standard
@@ -70,8 +71,10 @@ public final class SyncGramChatLock {
     public func setSecurityQuestion(_ question: String, answer: String) {
         let trimmedQuestion = question.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedAnswer = answer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let salt = UUID().uuidString
         self.defaults.set(trimmedQuestion, forKey: Key.securityQuestion)
-        self.defaults.set(SyncGramChatLock.hash(trimmedAnswer), forKey: Key.securityAnswerHash)
+        self.defaults.set(salt, forKey: Key.securityAnswerSalt)
+        self.defaults.set(SyncGramChatLock.hash(trimmedAnswer, salt: salt), forKey: Key.securityAnswerHash)
     }
 
     public func verifySecurityAnswer(_ answer: String) -> Bool {
@@ -79,7 +82,15 @@ public final class SyncGramChatLock {
             return false
         }
         let normalized = answer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return SyncGramChatLock.hash(normalized) == stored
+        if let salt = self.defaults.string(forKey: Key.securityAnswerSalt) {
+            return SyncGramChatLock.hash(normalized, salt: salt) == stored
+        }
+        // Answers saved by earlier builds had no salt. Accept the old hash once and migrate.
+        if SyncGramChatLock.hash(normalized, salt: "") == stored, let question = self.securityQuestion {
+            self.setSecurityQuestion(question, answer: answer)
+            return true
+        }
+        return false
     }
 
     public func clearAllLocks() {
@@ -90,6 +101,7 @@ public final class SyncGramChatLock {
     public func clearSecurityQuestion() {
         self.defaults.removeObject(forKey: Key.securityQuestion)
         self.defaults.removeObject(forKey: Key.securityAnswerHash)
+        self.defaults.removeObject(forKey: Key.securityAnswerSalt)
     }
 
     public func authenticate(reason: String, completion: @escaping (Bool) -> Void) {
@@ -107,8 +119,8 @@ public final class SyncGramChatLock {
         }
     }
 
-    private static func hash(_ value: String) -> String {
-        let digest = SHA256.hash(data: Data(value.utf8))
+    private static func hash(_ value: String, salt: String) -> String {
+        let digest = SHA256.hash(data: Data((salt + value).utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 }

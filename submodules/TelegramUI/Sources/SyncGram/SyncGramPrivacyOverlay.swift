@@ -9,6 +9,7 @@ public final class SyncGramPrivacyOverlay {
     public static let shared = SyncGramPrivacyOverlay()
 
     private var observer: NSObjectProtocol?
+    private var settingObserver: NSObjectProtocol?
     private var overlay: UIView?
     private var isStarted = false
 
@@ -25,6 +26,10 @@ public final class SyncGramPrivacyOverlay {
         self.isStarted = true
         UIDevice.current.beginGeneratingDeviceOrientationNotifications()
         self.observer = NotificationCenter.default.addObserver(forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.update()
+        }
+        // Turning the feature off must remove an existing blur right away, not on the next flip.
+        self.settingObserver = NotificationCenter.default.addObserver(forName: SyncGramNotifications.flipToHideChanged, object: nil, queue: .main) { [weak self] _ in
             self?.update()
         }
         self.lastOrientation = UIDevice.current.orientation
@@ -71,12 +76,11 @@ public final class SyncGramPrivacyOverlay {
     }
 
     private func keyWindow() -> UIWindow? {
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            if let key = scene.windows.first(where: { $0.isKeyWindow }) {
-                return key
-            }
-            return scene.windows.first
+        let scenes = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+        let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+        guard let scene else {
+            return nil
         }
-        return nil
+        return scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first
     }
 }

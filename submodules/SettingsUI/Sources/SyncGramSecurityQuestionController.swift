@@ -127,6 +127,7 @@ public final class SyncGramSecurityQuestionController: ViewController {
         SyncGramChatLock.shared.setSecurityQuestion(question, answer: answer)
         self.answerField.text = ""
         self.statusLabel.text = "Сохранено. Ответ хранится только на этом устройстве в виде хеша."
+        NotificationCenter.default.post(name: SyncGramNotifications.settingsChanged, object: nil)
     }
 
     @objc private func resetTapped() {

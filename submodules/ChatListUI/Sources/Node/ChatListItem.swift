@@ -4073,7 +4073,6 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     strongSelf.layoutParams = (item, first, last, firstWithHeader, nextIsPinned, nextHasActiveRevealControls, params, countersSize)
                     strongSelf.nextHasActiveRevealControls = nextHasActiveRevealControls
                     strongSelf.currentItemHeight = itemHeight
-                    strongSelf.layer.anchorPoint = CGPoint(x: 0.5, y: 0.0)
                     strongSelf.cachedChatListText = chatListText
                     strongSelf.cachedChatListSearchResult = chatListSearchResult
                     strongSelf.cachedChatListQuoteSearchResult = chatListQuoteSearchResult

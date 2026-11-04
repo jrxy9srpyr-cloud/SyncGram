@@ -307,7 +307,7 @@ typedef enum {
 
         UIImage *syncGramLogo = [UIImage imageNamed:@"SyncGramLoginLogo"];
         if (syncGramLogo != nil) {
-            CGFloat logoSize = floor(_glkView.bounds.size.width * 0.74);
+            CGFloat logoSize = floor(MIN(_glkView.bounds.size.width * 0.74, 148.0));
             CGRect logoFrame = CGRectMake(floor((_glkView.bounds.size.width - logoSize) / 2.0), floor((_glkView.bounds.size.height - logoSize) / 2.0), logoSize, logoSize);
             _syncGramLogoView = [[UIImageView alloc] initWithFrame:logoFrame];
             _syncGramLogoView.image = syncGramLogo;

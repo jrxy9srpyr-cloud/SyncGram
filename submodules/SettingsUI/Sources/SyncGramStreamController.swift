@@ -26,6 +26,7 @@ public final class SyncGramStreamController: ViewController {
     private let stackView: UIStackView
     private let disposable = MetaDisposable()
     private var currentItems: [SyncGramStreamItem] = []
+    private var pendingScrollOffset: CGPoint?
 
     public init(context: AccountContext) {
         self.context = context
@@ -100,6 +101,8 @@ public final class SyncGramStreamController: ViewController {
     }
 
     private func update(_ items: [SyncGramStreamItem]) {
+        // Keep the reader's position when the feed refreshes.
+        self.pendingScrollOffset = self.scrollView.contentOffset
         for view in self.stackView.arrangedSubviews {
             view.removeFromSuperview()
         }
@@ -165,6 +168,7 @@ public final class SyncGramStreamController: ViewController {
             let jump = UIButton(type: .system)
             jump.setTitle("Перейти к сообщению", for: .normal)
             jump.setTitleColor(theme.list.itemAccentColor, for: .normal)
+            jump.accessibilityLabel = "Перейти к сообщению в чате"
             jump.titleLabel?.font = Font.semibold(12.0)
             jump.tag = index
             jump.addTarget(self, action: #selector(self.jumpTapped(_:)), for: .touchUpInside)
@@ -226,5 +230,11 @@ public final class SyncGramStreamController: ViewController {
         let height = self.stackView.systemLayoutSizeFitting(CGSize(width: width, height: .greatestFiniteMagnitude)).height
         self.stackView.frame = CGRect(x: 0.0, y: 0.0, width: width, height: height)
         self.scrollView.contentSize = CGSize(width: width, height: height)
+
+        if let offset = self.pendingScrollOffset {
+            self.pendingScrollOffset = nil
+            let maxOffset = max(0.0, height - self.scrollView.bounds.height)
+            self.scrollView.setContentOffset(CGPoint(x: 0.0, y: min(offset.y, maxOffset)), animated: false)
+        }
     }
 }

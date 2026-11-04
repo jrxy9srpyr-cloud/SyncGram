@@ -336,6 +336,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     let messageActionUrlAuthDisposable = MetaDisposable()
     let editMessageDisposable = MetaDisposable()
     private var syncGramLockOverlay: UIView?
+    private var syncGramChatIsLocked = false
     let editMessageErrorsDisposable = MetaDisposable()
     let enqueueMediaMessageDisposable = MetaDisposable()
     var resolvePeerByNameDisposable: MetaDisposable?
@@ -7850,7 +7851,9 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         self.didAppear = true
         
         self.chatDisplayNode.historyNode.experimentalSnapScrollToItem = false
-        self.chatDisplayNode.historyNode.canReadHistory.set(self.computedCanReadHistoryPromise.get())
+        if !self.syncGramChatIsLocked {
+            self.chatDisplayNode.historyNode.canReadHistory.set(self.computedCanReadHistoryPromise.get())
+        }
         self.chatDisplayNode.historyNode.areContentAnimationsEnabled = true
         
         if !self.alwaysShowSearchResultsAsList {
@@ -10905,6 +10908,10 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         guard let peerId = self.chatLocation.peerId, SyncGramChatLock.shared.isLocked(peerId), !SyncGramChatLock.shared.isUnlocked(peerId) else {
             return
         }
+        self.syncGramChatIsLocked = true
+        self.chatDisplayNode.historyNode.canReadHistory.set(false)
+        self.chatDisplayNode.dismissInput()
+
         if let overlay = self.syncGramLockOverlay {
             self.view.bringSubviewToFront(overlay)
             return
@@ -10933,6 +10940,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         titleLabel.textColor = theme.list.itemPrimaryTextColor
         titleLabel.textAlignment = .center
         titleLabel.numberOfLines = 0
+        titleLabel.preferredMaxLayoutWidth = 280.0
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let messageLabel = UILabel()
@@ -10941,6 +10949,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         messageLabel.textColor = theme.list.itemSecondaryTextColor
         messageLabel.textAlignment = .center
         messageLabel.numberOfLines = 0
+        messageLabel.preferredMaxLayoutWidth = 280.0
         messageLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let unlockButton = UIButton(type: .system)
@@ -10950,6 +10959,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         unlockButton.backgroundColor = theme.list.itemAccentColor
         unlockButton.layer.cornerRadius = 10.0
         unlockButton.translatesAutoresizingMaskIntoConstraints = false
+        unlockButton.accessibilityLabel = "Разблокировать чат"
         unlockButton.addAction(UIAction(handler: { [weak self] _ in
             self?.syncGramAttemptUnlock(peerId: peerId)
         }), for: .touchUpInside)
@@ -10959,6 +10969,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         cancelButton.titleLabel?.font = Font.regular(15.0)
         cancelButton.setTitleColor(theme.list.itemSecondaryTextColor, for: .normal)
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
+        cancelButton.accessibilityLabel = "Назад"
         cancelButton.addAction(UIAction(handler: { [weak self] _ in
             self?.navigationController?.popViewController(animated: true)
         }), for: .touchUpInside)
@@ -10967,12 +10978,15 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             card.addSubview(view)
         }
 
+        let cardWidth = card.widthAnchor.constraint(equalToConstant: 320.0)
+        cardWidth.priority = .defaultHigh
+
         NSLayoutConstraint.activate([
             card.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
             card.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
-            card.leadingAnchor.constraint(greaterThanOrEqualTo: overlay.leadingAnchor, constant: 32.0),
-            card.trailingAnchor.constraint(lessThanOrEqualTo: overlay.trailingAnchor, constant: -32.0),
-            card.widthAnchor.constraint(lessThanOrEqualToConstant: 320.0),
+            card.leadingAnchor.constraint(greaterThanOrEqualTo: overlay.leadingAnchor, constant: 24.0),
+            card.trailingAnchor.constraint(lessThanOrEqualTo: overlay.trailingAnchor, constant: -24.0),
+            cardWidth,
 
             iconLabel.topAnchor.constraint(equalTo: card.topAnchor, constant: 24.0),
             iconLabel.centerXAnchor.constraint(equalTo: card.centerXAnchor),
@@ -11033,7 +11047,9 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 failure.addAction(UIAlertAction(title: "OK", style: .default, handler: { [weak self] _ in
                     self?.syncGramAskSecurityQuestion(peerId: peerId)
                 }))
-                self.present(failure, animated: true, completion: nil)
+                DispatchQueue.main.async {
+                    self.present(failure, animated: true, completion: nil)
+                }
             }
         }))
         DispatchQueue.main.async {
@@ -11044,6 +11060,8 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     private func syncGramRemoveChatLock() {
         self.syncGramLockOverlay?.removeFromSuperview()
         self.syncGramLockOverlay = nil
+        self.syncGramChatIsLocked = false
+        self.chatDisplayNode.historyNode.canReadHistory.set(self.computedCanReadHistoryPromise.get())
     }
 
     // MARK: - End SyncGram chat lock

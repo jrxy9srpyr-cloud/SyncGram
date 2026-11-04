@@ -104,6 +104,7 @@ public final class SyncGramLocalPremiumController: ViewController {
         self.activateButton.setTitleColor(self.accentColor, for: .normal)
         self.activateButton.backgroundColor = .white
         self.activateButton.layer.cornerRadius = 22.0
+        self.activateButton.accessibilityLabel = "Активировать локальный премиум"
         self.activateButton.addTarget(self, action: #selector(self.activateTapped), for: .touchUpInside)
         self.headerView.addSubview(self.activateButton)
 
@@ -177,11 +178,13 @@ public final class SyncGramLocalPremiumController: ViewController {
     private func updateState() {
         let isActive = SyncGramSettings.localPremiumEnabled
         if isActive {
-            self.statusLabel.text = "Локально активно\nВсе функции SyncGram разблокированы на этом устройстве."
+            self.statusLabel.text = "Локально активно\nКосметические функции SyncGram включены на этом устройстве."
             self.activateButton.setTitle("Отключить", for: .normal)
+            self.activateButton.accessibilityLabel = "Отключить локальный премиум"
         } else {
             self.statusLabel.text = "Косметическая подписка SyncGram\nВключает локальные функции без изменения аккаунта."
             self.activateButton.setTitle("Активировать", for: .normal)
+            self.activateButton.accessibilityLabel = "Активировать локальный премиум"
         }
         self.benefitsStack.alpha = isActive ? 1.0 : 0.85
         self.view.setNeedsLayout()
@@ -192,8 +195,14 @@ public final class SyncGramLocalPremiumController: ViewController {
         SyncGramSettings.localPremiumEnabled = !isActive
         if !isActive {
             // The one tangible perk of the local subscription: no sponsored messages.
+            // Remember the previous value so turning the premium off restores it.
+            SyncGramSettings.localPremiumPreviousHideAds = SyncGramSettings.hideAdsEnabled
             SyncGramSettings.hideAdsEnabled = true
+        } else if let previousHideAds = SyncGramSettings.localPremiumPreviousHideAds {
+            SyncGramSettings.hideAdsEnabled = previousHideAds
+            SyncGramSettings.localPremiumPreviousHideAds = nil
         }
+        NotificationCenter.default.post(name: SyncGramNotifications.settingsChanged, object: nil)
         self.updateState()
     }
 

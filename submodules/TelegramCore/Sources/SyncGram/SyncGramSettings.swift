@@ -19,6 +19,7 @@ public enum SyncGramSettings {
         static let signingNotifications = "syncgram.signingNotifications"
         static let chatListScale = "syncgram.chatListScale"
         static let localPremium = "syncgram.localPremium"
+        static let localPremiumPreviousHideAds = "syncgram.localPremium.previousHideAds"
     }
 
     private static var defaults: UserDefaults {
@@ -106,6 +107,24 @@ public enum SyncGramSettings {
         set { defaults.set(newValue, forKey: Key.localPremium) }
     }
 
+    /// The value of `hideAdsEnabled` before the local premium turned it on, so turning the
+    /// premium off can restore the user's previous choice.
+    public static var localPremiumPreviousHideAds: Bool? {
+        get {
+            if defaults.object(forKey: Key.localPremiumPreviousHideAds) == nil {
+                return nil
+            }
+            return defaults.bool(forKey: Key.localPremiumPreviousHideAds)
+        }
+        set {
+            if let value = newValue {
+                defaults.set(value, forKey: Key.localPremiumPreviousHideAds)
+            } else {
+                defaults.removeObject(forKey: Key.localPremiumPreviousHideAds)
+            }
+        }
+    }
+
     /// 1.0 is the system size. Values below 1.0 make the chat list more compact.
     public static var chatListScale: Double {
         get {
@@ -114,6 +133,24 @@ public enum SyncGramSettings {
             }
             return min(1.0, max(0.6, defaults.double(forKey: Key.chatListScale)))
         }
-        set { defaults.set(min(1.0, max(0.6, newValue)), forKey: Key.chatListScale) }
+        set {
+            let value = min(1.0, max(0.6, newValue))
+            defaults.set(value, forKey: Key.chatListScale)
+            SyncGramChatListMetrics.scale = value
+        }
     }
+}
+
+/// Names of the local notifications used to propagate SyncGram setting changes between modules.
+public enum SyncGramNotifications {
+    public static let hideOnlineChanged = Notification.Name("SyncGramHideOnlineChanged")
+    public static let chatListScaleChanged = Notification.Name("SyncGramChatListScaleChanged")
+    public static let navigationChanged = Notification.Name("SyncGramNavigationChanged")
+    public static let flipToHideChanged = Notification.Name("SyncGramFlipToHideChanged")
+    public static let settingsChanged = Notification.Name("SyncGramSettingsChanged")
+}
+
+/// Cached chat list scale, so the row layout does not read UserDefaults on every access.
+public enum SyncGramChatListMetrics {
+    public static var scale: Double = SyncGramSettings.chatListScale
 }

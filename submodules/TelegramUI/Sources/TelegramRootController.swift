@@ -206,15 +206,21 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
                 result.append((tab, controller))
             }
         }
-        if !result.contains(where: { $0.0 == .chats }) {
+        // Chats and Settings are kept in the tab bar by default, but an explicit "hide" choice
+        // is respected now. If every tab is hidden, fall back to Chats so the bar is never empty.
+        let settings = SyncGramNavigationSettings.shared
+        if !result.contains(where: { $0.0 == .chats }) && settings.placement(for: .chats) != .hidden {
             if let controller = pairs.first(where: { $0.0 == .chats })?.1 {
                 result.insert((.chats, controller), at: 0)
             }
         }
-        if !result.contains(where: { $0.0 == .settings }) {
+        if !result.contains(where: { $0.0 == .settings }) && settings.placement(for: .settings) != .hidden {
             if let controller = pairs.first(where: { $0.0 == .settings })?.1 {
                 result.append((.settings, controller))
             }
+        }
+        if result.isEmpty, let controller = pairs.first(where: { $0.0 == .chats })?.1 {
+            result.append((.chats, controller))
         }
         return result
     }
@@ -237,7 +243,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.syncGramShowCallsTab = showCallsTab
         self.syncGramShowNewsTab = showNewsTab
         if self.syncGramNavigationObserver == nil {
-            self.syncGramNavigationObserver = NotificationCenter.default.addObserver(forName: Notification.Name("SyncGramNavigationChanged"), object: nil, queue: .main, using: { [weak self] _ in
+            self.syncGramNavigationObserver = NotificationCenter.default.addObserver(forName: SyncGramNotifications.navigationChanged, object: nil, queue: .main, using: { [weak self] _ in
                 guard let self else {
                     return
                 }

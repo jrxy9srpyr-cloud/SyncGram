@@ -37,7 +37,7 @@ private final class AccountPresenceManagerImpl {
 
         // Enabling "hide online" has to be applied right away, even when the online/offline
         // state itself has not changed since the last presence update.
-        self.syncGramHideOnlineObserver = NotificationCenter.default.addObserver(forName: Notification.Name("SyncGramHideOnlineChanged"), object: nil, queue: nil, using: { [weak self] _ in
+        self.syncGramHideOnlineObserver = NotificationCenter.default.addObserver(forName: SyncGramNotifications.hideOnlineChanged, object: nil, queue: nil, using: { [weak self] _ in
             guard let self else {
                 return
             }
