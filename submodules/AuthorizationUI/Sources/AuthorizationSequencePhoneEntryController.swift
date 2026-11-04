@@ -13,8 +13,9 @@ import PhoneNumberFormat
 import DebugSettingsUI
 import MessageUI
 import AuthenticationServices
+import UniformTypeIdentifiers
 
-public final class AuthorizationSequencePhoneEntryController: ViewController, MFMailComposeViewControllerDelegate, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+public final class AuthorizationSequencePhoneEntryController: ViewController, MFMailComposeViewControllerDelegate, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding, UIDocumentPickerDelegate {
     private var controllerNode: AuthorizationSequencePhoneEntryControllerNode {
         return self.displayNode as! AuthorizationSequencePhoneEntryControllerNode
     }
@@ -97,6 +98,11 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
         if let countriesConfiguration {
             AuthorizationSequenceCountrySelectionController.setupCountryCodes(countries: countriesConfiguration.countries, codesByPrefix: countriesConfiguration.countriesByPrefix)
         }
+
+        // Login-time entry point for the encrypted SyncGram session file. It restores the local
+        // SyncGram settings and shows which account the file belongs to; Telegram still requires
+        // its own login code, because the auth key lives in the encrypted account database.
+        self.navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Сессия", style: .plain, target: self, action: #selector(self.importSessionPressed))
     }
     
     required init(coder aDecoder: NSCoder) {
@@ -105,6 +111,84 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
     
     deinit {
         self.termsDisposable.dispose()
+    }
+
+    // MARK: - SyncGram session file
+
+    @objc private func importSessionPressed() {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.data, .json], asCopy: true)
+        picker.delegate = self
+        self.present(picker, animated: true, completion: nil)
+    }
+
+    public func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first, let data = try? Data(contentsOf: url) else {
+            return
+        }
+        let question: String
+        do {
+            question = try SyncGramSessionArchive.question(in: data)
+        } catch {
+            self.presentSessionAlert(title: "Ошибка", message: "Это не файл сессии SyncGram.")
+            return
+        }
+        let alert = UIAlertController(title: "Контрольный вопрос", message: question, preferredStyle: .alert)
+        alert.addTextField { field in
+            field.placeholder = "Ответ"
+            field.isSecureTextEntry = true
+            field.autocapitalizationType = .none
+            field.autocorrectionType = .no
+        }
+        alert.addAction(UIAlertAction(title: "Отмена", style: .cancel, handler: nil))
+        alert.addAction(UIAlertAction(title: "Открыть", style: .default, handler: { [weak self, weak alert] _ in
+            guard let self else {
+                return
+            }
+            let answer = alert?.textFields?.first?.text ?? ""
+            self.decryptSessionFile(data: data, answer: answer)
+        }))
+        self.present(alert, animated: true, completion: nil)
+    }
+
+    private func decryptSessionFile(data: Data, answer: String) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result: Result<(String, SyncGramSessionSnapshot), Error>
+            do {
+                result = .success(try SyncGramSessionArchive.decrypt(data: data, answer: answer))
+            } catch {
+                result = .failure(error)
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else {
+                    return
+                }
+                switch result {
+                case let .success((_, snapshot)):
+                    SyncGramSettings.applySessionSnapshot(snapshot.settings)
+                    NotificationCenter.default.post(name: SyncGramNotificationNames.settingsChanged, object: nil)
+                    NotificationCenter.default.post(name: SyncGramNotificationNames.chatListScaleChanged, object: nil)
+                    var lines: [String] = ["Аккаунт: \(snapshot.accountTitle)"]
+                    if let username = snapshot.username {
+                        lines.append("Username: @\(username)")
+                    }
+                    if let phone = snapshot.phone, !phone.isEmpty {
+                        lines.append("Номер: +\(phone)")
+                        UIPasteboard.general.string = phone
+                        lines.append("Номер скопирован в буфер обмена.")
+                    }
+                    lines.append("Настройки SyncGram восстановлены. Войдите по коду из Telegram.")
+                    self.presentSessionAlert(title: "Файл сессии открыт", message: lines.joined(separator: "\n"))
+                case .failure:
+                    self.presentSessionAlert(title: "Ошибка", message: "Неверный ответ или файл повреждён.")
+                }
+            }
+        }
+    }
+
+    private func presentSessionAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+        self.present(alert, animated: true, completion: nil)
     }
     
     @objc private func cancelPressed() {

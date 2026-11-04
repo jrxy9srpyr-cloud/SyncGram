@@ -19,8 +19,6 @@ private enum SyncGramSettingsToggle: Int32 {
     case hideAds
     case flipToHide
     case backgroundRefresh
-    case deletedNotifications
-    case signingNotifications
 }
 
 private final class SyncGramSettingsControllerArguments {
@@ -30,17 +28,17 @@ private final class SyncGramSettingsControllerArguments {
     let openNavigation: () -> Void
     let openAccounts: () -> Void
     let openCache: () -> Void
-    let openStream: () -> Void
+    let openSession: () -> Void
     let readAllChats: () -> Void
 
-    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openSecurityQuestion: @escaping () -> Void, openNavigation: @escaping () -> Void, openAccounts: @escaping () -> Void, openCache: @escaping () -> Void, openStream: @escaping () -> Void, readAllChats: @escaping () -> Void) {
+    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openSecurityQuestion: @escaping () -> Void, openNavigation: @escaping () -> Void, openAccounts: @escaping () -> Void, openCache: @escaping () -> Void, openSession: @escaping () -> Void, readAllChats: @escaping () -> Void) {
         self.toggle = toggle
         self.openChatListSize = openChatListSize
         self.openSecurityQuestion = openSecurityQuestion
         self.openNavigation = openNavigation
         self.openAccounts = openAccounts
         self.openCache = openCache
-        self.openStream = openStream
+        self.openSession = openSession
         self.readAllChats = readAllChats
     }
 }
@@ -62,15 +60,13 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
     case hideAds(Bool)
     case flipToHide(Bool)
     case backgroundRefresh(Bool)
-    case deletedNotifications(Bool)
-    case signingNotifications(Bool)
     case signingInfo(String)
     case chatListSize(String)
     case securityQuestion(String)
     case navigation
     case accounts
     case cache
-    case stream
+    case session
     case readAll
     case footer
 
@@ -104,28 +100,24 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return 10
         case .backgroundRefresh:
             return 11
-        case .deletedNotifications:
-            return 12
-        case .signingNotifications:
-            return 13
         case .signingInfo:
-            return 14
+            return 12
         case .chatListSize:
-            return 15
+            return 13
         case .securityQuestion:
-            return 16
+            return 14
         case .navigation:
-            return 17
+            return 15
         case .accounts:
-            return 18
+            return 16
         case .cache:
-            return 19
-        case .stream:
-            return 20
+            return 17
+        case .session:
+            return 18
         case .readAll:
-            return 21
+            return 19
         case .footer:
-            return 22
+            return 20
         }
     }
 
@@ -182,14 +174,6 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Фоновая синхронизация", text: "Иногда проверяет обновления, когда приложение свёрнуто. iOS решает когда.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.backgroundRefresh, value)
             })
-        case let .deletedNotifications(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Уведомления об удалённых", text: "Показывает локальный баннер, когда удалённое сообщение сохранено.", value: value, sectionId: self.section, style: .blocks, updated: { value in
-                arguments.toggle(.deletedNotifications, value)
-            })
-        case let .signingNotifications(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Уведомлять об окончании подписи", text: "Локальное напоминание за день до истечения и в момент окончания срока.", value: value, sectionId: self.section, style: .blocks, updated: { value in
-                arguments.toggle(.signingNotifications, value)
-            })
         case let .signingInfo(value):
             return ItemListDisclosureItem(presentationData: presentationData, title: "Срок подписи", label: value, sectionId: self.section, style: .blocks, action: nil)
         case let .chatListSize(value):
@@ -212,9 +196,9 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListDisclosureItem(presentationData: presentationData, title: "Умное управление кэшем", label: "Размер и очистка", sectionId: self.section, style: .blocks, action: {
                 arguments.openCache()
             })
-        case .stream:
-            return ItemListDisclosureItem(presentationData: presentationData, title: "Поток", label: "Все чаты", sectionId: self.section, style: .blocks, action: {
-                arguments.openStream()
+        case .session:
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Сессия аккаунта", label: "Экспорт и импорт", sectionId: self.section, style: .blocks, action: {
+                arguments.openSession()
             })
         case .readAll:
             return ItemListActionItem(presentationData: presentationData, title: "Прочитать все чаты", kind: .generic, alignment: .center, sectionId: self.section, style: .blocks, action: {
@@ -250,44 +234,16 @@ private func syncGramSettingsEntries(signingInfoText: String) -> [SyncGramSettin
         .hideAds(SyncGramSettings.hideAdsEnabled),
         .flipToHide(SyncGramSettings.flipToHideEnabled),
         .backgroundRefresh(SyncGramSettings.backgroundRefreshEnabled),
-        .deletedNotifications(SyncGramSettings.deletedMessageNotificationsEnabled),
         .signingInfo(signingInfoText),
-        .signingNotifications(SyncGramSettings.signingNotificationsEnabled),
         .chatListSize("\(Int(round(SyncGramSettings.chatListScale * 100.0)))%"),
         .securityQuestion(SyncGramChatLock.shared.hasSecurityQuestion ? "Задан" : "Не задан"),
         .navigation,
         .accounts,
         .cache,
-        .stream,
+        .session,
         .readAll,
         .footer
     ]
-}
-
-private func syncGramActiveWindow() -> UIWindow? {
-    let scenes = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
-    let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
-    guard let scene else {
-        return nil
-    }
-    return scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first
-}
-
-private func syncGramPresentReadAllConfirmation(success: Bool) {
-    guard let window = syncGramActiveWindow() else {
-        return
-    }
-    var controller = window.rootViewController
-    while let presented = controller?.presentedViewController {
-        controller = presented
-    }
-    let alert = UIAlertController(
-        title: success ? "Готово" : "Не удалось",
-        message: success ? "Все чаты отмечены как прочитанные." : "Не удалось отметить чаты как прочитанные. Проверьте подключение и попробуйте ещё раз.",
-        preferredStyle: .alert
-    )
-    alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
-    controller?.present(alert, animated: true, completion: nil)
 }
 
 private var syncGramSettingsChangeObserver: NSObjectProtocol?
@@ -307,7 +263,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     var openNavigationImpl: (() -> Void)?
     var openAccountsImpl: (() -> Void)?
     var openCacheImpl: (() -> Void)?
-    var openStreamImpl: (() -> Void)?
+    var openSessionImpl: (() -> Void)?
 
     let arguments = SyncGramSettingsControllerArguments(toggle: { toggle, value in
         switch toggle {
@@ -335,11 +291,6 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             NotificationCenter.default.post(name: SyncGramNotificationNames.flipToHideChanged, object: nil)
         case .backgroundRefresh:
             SyncGramSettings.backgroundRefreshEnabled = value
-        case .deletedNotifications:
-            SyncGramSettings.deletedMessageNotificationsEnabled = value
-        case .signingNotifications:
-            SyncGramSettings.signingNotificationsEnabled = value
-            SyncGramSigningInfo.shared.scheduleNotificationsIfNeeded()
         }
         revision.set(0)
     }, openChatListSize: {
@@ -352,14 +303,14 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
         openAccountsImpl?()
     }, openCache: {
         openCacheImpl?()
-    }, openStream: {
-        openStreamImpl?()
+    }, openSession: {
+        openSessionImpl?()
     }, readAllChats: {
         // `markAllChatsAsReadInteractively` cannot fail (Signal<Never, NoError>), so only
         // the completion branch exists.
         let _ = context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: .root, filterPredicate: nil)]).startStandalone(completed: {
             DispatchQueue.main.async {
-                syncGramPresentReadAllConfirmation(success: true)
+                SyncGramToast.show("Все чаты отмечены как прочитанные")
             }
         })
     })
@@ -396,8 +347,8 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     openCacheImpl = { [weak controller] in
         controller?.push(SyncGramCacheController(context: context))
     }
-    openStreamImpl = { [weak controller] in
-        controller?.push(SyncGramStreamController(context: context))
+    openSessionImpl = { [weak controller] in
+        controller?.push(SyncGramSessionController(context: context))
     }
     return controller
 }

@@ -1,5 +1,4 @@
 import Foundation
-import UserNotifications
 
 public final class SyncGramSigningInfo {
     public static let shared = SyncGramSigningInfo()
@@ -29,37 +28,9 @@ public final class SyncGramSigningInfo {
         return max(0, Int(ceil(self.expiryDate.timeIntervalSinceNow / (24.0 * 60.0 * 60.0))))
     }
 
+    /// Only records the first launch so settings can show the expiry date. No notifications are
+    /// scheduled any more: local reminders were removed by request.
     public func registerLaunch() {
         let _ = self.firstLaunchDate
-        self.scheduleNotificationsIfNeeded()
-    }
-
-    public func scheduleNotificationsIfNeeded() {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [
-            "\(self.notificationPrefix).day",
-            "\(self.notificationPrefix).now"
-        ])
-        guard SyncGramSettings.signingNotificationsEnabled else {
-            return
-        }
-        let calendar = Calendar.current
-        let dates: [(String, Date, String)] = [
-            ("day", self.expiryDate.addingTimeInterval(-24.0 * 60.0 * 60.0), "Подпись SyncGram истекает завтра. Переподпиши приложение."),
-            ("now", self.expiryDate, "Срок подписи SyncGram истёк. Переподпиши приложение, иначе оно перестанет запускаться.")
-        ]
-        for (suffix, date, text) in dates {
-            if date <= Date() {
-                continue
-            }
-            let content = UNMutableNotificationContent()
-            content.title = "Срок подписи SyncGram"
-            content.body = text
-            content.sound = .default
-            var components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
-            components.second = 0
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-            let request = UNNotificationRequest(identifier: "\(self.notificationPrefix).\(suffix)", content: content, trigger: trigger)
-            UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
-        }
     }
 }

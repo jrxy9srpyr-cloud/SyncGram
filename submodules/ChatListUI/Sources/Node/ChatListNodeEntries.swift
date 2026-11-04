@@ -988,6 +988,40 @@ func chatListNodeEntriesForView(view: EngineChatList, state: ChatListNodeState, 
         }
     }
 
+    if isMainTab, case .chatList = mode {
+        // A local, server-less chat that aggregates the selected chats. It is appended last because
+        // the entries array is stored bottom-to-top, so this puts it at the very top of the list.
+        result.append(.PeerEntry(ChatListNodeEntry.PeerEntryData(
+            index: .chatList(EngineChatList.Item.Index.ChatList(pinningIndex: nil, messageIndex: MessageIndex.absoluteUpperBound())),
+            presentationData: state.presentationData,
+            messages: [],
+            readState: nil,
+            isRemovedFromTotalUnreadCount: false,
+            draftState: nil,
+            mediaDraftContentType: nil,
+            peer: SyncGramStreamChat.renderedPeer,
+            threadInfo: nil,
+            presence: nil,
+            hasUnseenMentions: false,
+            hasUnseenReactions: false,
+            hasUnseenPollVotes: false,
+            editing: state.editing,
+            hasActiveRevealControls: false,
+            selected: false,
+            inputActivities: nil,
+            promoInfo: nil,
+            hasFailedMessages: false,
+            isContact: false,
+            autoremoveTimeout: nil,
+            forumTopicData: nil,
+            topForumTopicItems: [],
+            revealed: false,
+            storyState: nil,
+            requiresPremiumForMessaging: false,
+            displayAsTopicList: false
+        )))
+    }
+
     if result.count >= 1, case .HoleEntry = result[result.count - 1] {
         return ([.HeaderEntry], true)
     } else if result.count == 1, case .HoleEntry = result[0] {

@@ -3968,6 +3968,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         strongSelf.contentContainersWrapperNode.frame = CGRect(origin: CGPoint(), size: layout.contentSize)
         
         strongSelf.appliedItem = item
+        // Messages that were deleted on the server but are retained locally stay readable, just
+        // slightly dimmed, so a screenshot still shows the text while the row is visibly marked.
+        strongSelf.mainContainerNode.alpha = item.message.isSyncGramDeleted ? 0.62 : 1.0
         strongSelf.appliedForwardInfo = ChatMessageAppliedForwardInfo(messageId: item.content.firstMessage.id, source: forwardSource, authorSignature: forwardAuthorSignature)
         strongSelf.updateAccessibilityData(accessibilityData)
         strongSelf.disablesComments = disablesComments

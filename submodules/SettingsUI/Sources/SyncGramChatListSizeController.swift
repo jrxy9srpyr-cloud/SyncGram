@@ -19,7 +19,6 @@ public final class SyncGramChatListSizeController: ViewController {
     private let previewSubtitle: UILabel
     private let previewTime: UILabel
     private let previewBadge: UILabel
-    private let previewButton: UILabel
 
     private let titleLabel: UILabel
     private let descriptionLabel: UILabel
@@ -38,7 +37,6 @@ public final class SyncGramChatListSizeController: ViewController {
         self.previewSubtitle = UILabel()
         self.previewTime = UILabel()
         self.previewBadge = UILabel()
-        self.previewButton = UILabel()
         self.titleLabel = UILabel()
         self.descriptionLabel = UILabel()
 
@@ -123,15 +121,6 @@ public final class SyncGramChatListSizeController: ViewController {
         self.previewBadge.clipsToBounds = true
         self.previewRow.addSubview(self.previewBadge)
 
-        self.previewButton.text = "Открыть"
-        self.previewButton.font = Font.semibold(13.0)
-        self.previewButton.textColor = theme.list.itemAccentColor
-        self.previewButton.backgroundColor = theme.list.itemAccentColor.withAlphaComponent(0.12)
-        self.previewButton.textAlignment = .center
-        self.previewButton.layer.cornerRadius = 8.0
-        self.previewButton.clipsToBounds = true
-        self.previewRow.addSubview(self.previewButton)
-
         self.updateValueLabel()
         self.applyPreviewScale()
     }
@@ -154,18 +143,30 @@ public final class SyncGramChatListSizeController: ViewController {
         guard width > 0.0 else {
             return
         }
-        let rowWidth = width - 16.0
-        self.previewRow.layer.anchorPoint = CGPoint(x: 0.0, y: 0.0)
-        self.previewRow.frame = CGRect(x: (width - rowWidth * scale) / 2.0, y: 8.0, width: rowWidth, height: 76.0)
-        self.previewRow.transform = CGAffineTransform(scaleX: scale, y: scale)
 
-        self.previewAvatar.frame = CGRect(x: 12.0, y: 10.0, width: 56.0, height: 56.0)
-        self.previewAvatarLabel.frame = self.previewAvatar.bounds
-        self.previewTitle.frame = CGRect(x: 80.0, y: 12.0, width: rowWidth - 160.0, height: 22.0)
-        self.previewSubtitle.frame = CGRect(x: 80.0, y: 38.0, width: rowWidth - 120.0, height: 20.0)
-        self.previewTime.frame = CGRect(x: rowWidth - 60.0, y: 12.0, width: 48.0, height: 18.0)
-        self.previewBadge.frame = CGRect(x: rowWidth - 34.0, y: 42.0, width: 20.0, height: 20.0)
-        self.previewButton.frame = CGRect(x: 80.0, y: 58.0, width: 76.0, height: 20.0)
+        // The row keeps its natural design size and is only scaled as a whole, about its own
+        // centre. Mixing `frame` with a top-left anchor point used to push it off centre and
+        // leave a gap under it, which is what made the preview look broken.
+        let rowWidth = width - 16.0
+        let rowHeight: CGFloat = 84.0
+        if self.previewRow.bounds.size != CGSize(width: rowWidth, height: rowHeight) {
+            self.previewRow.bounds = CGRect(origin: CGPoint(), size: CGSize(width: rowWidth, height: rowHeight))
+            self.previewRow.layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+            self.previewRow.position = CGPoint(x: self.previewContainer.bounds.midX, y: self.previewContainer.bounds.midY)
+
+            self.previewAvatar.frame = CGRect(x: 12.0, y: 14.0, width: 56.0, height: 56.0)
+            self.previewAvatar.layer.cornerRadius = 28.0
+            self.previewAvatarLabel.frame = self.previewAvatar.bounds
+
+            self.previewTitle.frame = CGRect(x: 80.0, y: 16.0, width: max(40.0, rowWidth - 152.0), height: 22.0)
+            self.previewSubtitle.frame = CGRect(x: 80.0, y: 42.0, width: max(40.0, rowWidth - 120.0), height: 20.0)
+            self.previewTime.frame = CGRect(x: rowWidth - 60.0, y: 16.0, width: 48.0, height: 18.0)
+            self.previewBadge.frame = CGRect(x: rowWidth - 34.0, y: 46.0, width: 20.0, height: 20.0)
+        } else {
+            self.previewRow.position = CGPoint(x: self.previewContainer.bounds.midX, y: self.previewContainer.bounds.midY)
+        }
+
+        self.previewRow.transform = CGAffineTransform(scaleX: scale, y: scale)
     }
 
     override public func viewDidLayoutSubviews() {
@@ -185,6 +186,7 @@ public final class SyncGramChatListSizeController: ViewController {
         y += 44.0
 
         self.previewContainer.frame = CGRect(x: 20.0, y: y, width: contentWidth, height: 108.0)
+        self.previewRow.layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
         self.applyPreviewScale()
     }
 }

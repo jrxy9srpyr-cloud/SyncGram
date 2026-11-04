@@ -315,7 +315,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                     dateFormat = .regular
                 }
                 let dateText = stringForMessageTimestampStatus(context: item.context, message: EngineMessage(item.message), dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, format: dateFormat, associatedData: item.associatedData)
-                let displayDateText = deleted ? "\u{1F5D1} \(dateText)" : dateText
+                let displayDateText = dateText
                 
                 let statusType: ChatMessageDateAndStatusType?
                 var displayStatus = false
@@ -720,6 +720,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                         context: item.context,
                         presentationData: item.presentationData,
                         edited: edited && !item.presentationData.isPreview,
+                        deleted: deleted && !item.presentationData.isPreview,
                         impressionCount: !item.presentationData.isPreview ? viewCount : nil,
                         dateText: displayDateText,
                         type: statusType,

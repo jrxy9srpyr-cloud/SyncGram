@@ -248,6 +248,9 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
         var context: AccountContext
         var presentationData: ChatPresentationData
         var edited: Bool
+        /// The message was deleted on the server but is kept locally. Renders a small trash icon
+        /// in the place where the "edited" label normally goes.
+        var deleted: Bool
         var impressionCount: Int?
         var dateText: String
         var type: ChatMessageDateAndStatusType
@@ -274,6 +277,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             context: AccountContext,
             presentationData: ChatPresentationData,
             edited: Bool,
+            deleted: Bool = false,
             impressionCount: Int?,
             dateText: String,
             type: ChatMessageDateAndStatusType,
@@ -299,6 +303,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             self.context = context
             self.presentationData = presentationData
             self.edited = edited
+            self.deleted = deleted
             self.impressionCount = impressionCount == 0 ? nil : impressionCount
             self.dateText = dateText
             self.type = type
@@ -330,6 +335,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
     private var clockFrameNode: ASImageNode?
     private var clockMinNode: ASImageNode?
     private let dateNode: TextNode
+    private var syncGramDeletedIcon: ASImageNode?
     private var impressionIcon: ASImageNode?
     private var reactionNodes: [MessageReaction.Reaction: StatusReactionNode] = [:]
     private let reactionButtonsContainer = ReactionButtonsAsyncLayoutContainer()
@@ -615,6 +621,19 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             }
             
             let dateFont = Font.regular(floor(arguments.presentationData.fontSize.baseDisplaySize * 11.0 / 17.0))
+
+            // A deleted-but-retained message gets a trash glyph exactly where the "edited" label
+            // would be, instead of the old emoji prefix inside the date text.
+            var syncGramDeletedImage: UIImage?
+            var syncGramDeletedWidth: CGFloat = 0.0
+            if arguments.deleted {
+                let configuration = UIImage.SymbolConfiguration(pointSize: dateFont.pointSize, weight: .regular)
+                if let image = UIImage(systemName: "trash", withConfiguration: configuration)?.withTintColor(dateColor, renderingMode: .alwaysOriginal) {
+                    syncGramDeletedImage = image
+                    syncGramDeletedWidth = image.size.width + 3.0
+                }
+            }
+
             let (date, dateApply) = dateLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: updatedDateText, font: dateFont, textColor: dateColor), backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .middle, constrainedSize: arguments.constrainedSize, alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
             
             let checkOffset = floor(arguments.presentationData.fontSize.baseDisplaySize * 6.0 / 17.0)
@@ -704,7 +723,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
                         clockMinNode?.displayWithoutProcessing = true
                         clockMinNode?.frame = CGRect(origin: CGPoint(), size: clockMinImage?.size ?? CGSize())
                     }
-                    clockPosition = CGPoint(x: leftInset + date.size.width + 8.5, y: 7.5 + offset)
+                    clockPosition = CGPoint(x: leftInset + syncGramDeletedWidth + date.size.width + 8.5, y: 7.5 + offset)
                 case let .Sent(read):
                     let hideStatus: Bool
                     switch arguments.type {
@@ -744,9 +763,9 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
                         let checkSize = loadedCheckFullImage!.size
                         
                         if read {
-                            checkReadFrame = CGRect(origin: CGPoint(x: leftInset + impressionWidth + date.size.width + 5.0 + statusWidth - checkSize.width, y: 3.0 + offset), size: checkSize)
+                            checkReadFrame = CGRect(origin: CGPoint(x: leftInset + impressionWidth + syncGramDeletedWidth + date.size.width + 5.0 + statusWidth - checkSize.width, y: 3.0 + offset), size: checkSize)
                         }
-                        checkSentFrame = CGRect(origin: CGPoint(x: leftInset + impressionWidth + date.size.width + 5.0 + statusWidth - checkSize.width - checkOffset, y: 3.0 + offset), size: checkSize)
+                        checkSentFrame = CGRect(origin: CGPoint(x: leftInset + impressionWidth + syncGramDeletedWidth + date.size.width + 5.0 + statusWidth - checkSize.width - checkOffset, y: 3.0 + offset), size: checkSize)
                     }
                 case .Failed:
                     statusWidth = 0.0
@@ -835,7 +854,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             
             leftInset += reactionInset
             
-            let layoutSize = CGSize(width: leftInset + impressionWidth + date.size.width + statusWidth + backgroundInsets.left + backgroundInsets.right, height: date.size.height + backgroundInsets.top + backgroundInsets.bottom)
+            let layoutSize = CGSize(width: leftInset + impressionWidth + syncGramDeletedWidth + date.size.width + statusWidth + backgroundInsets.left + backgroundInsets.right, height: date.size.height + backgroundInsets.top + backgroundInsets.bottom)
             
             let resultingWidth: CGFloat
             /// Deferred to the continue closure, which is the first point that knows the width the
@@ -1183,7 +1202,31 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
                             strongSelf.impressionIcon = nil
                         }
                         
-                        animation.animator.updateFrame(layer: strongSelf.dateNode.layer, frame: CGRect(origin: CGPoint(x: leftOffset + leftInset + backgroundInsets.left + impressionWidth, y: backgroundInsets.top + 1.0 + offset + verticalInset), size: date.size), completion: nil)
+                        if let syncGramDeletedImage = syncGramDeletedImage {
+                            let deletedIconFrame = CGRect(
+                                origin: CGPoint(x: leftOffset + leftInset + backgroundInsets.left + impressionWidth, y: backgroundInsets.top + 1.0 + offset + verticalInset + floor((date.size.height - syncGramDeletedImage.size.height) / 2.0)),
+                                size: syncGramDeletedImage.size
+                            )
+                            if let deletedIcon = strongSelf.syncGramDeletedIcon {
+                                if deletedIcon.image !== syncGramDeletedImage {
+                                    deletedIcon.image = syncGramDeletedImage
+                                }
+                                animation.animator.updateFrame(layer: deletedIcon.layer, frame: deletedIconFrame, completion: nil)
+                            } else {
+                                let deletedIcon = ASImageNode()
+                                deletedIcon.isLayerBacked = true
+                                deletedIcon.displaysAsynchronously = false
+                                deletedIcon.image = syncGramDeletedImage
+                                deletedIcon.frame = deletedIconFrame
+                                strongSelf.syncGramDeletedIcon = deletedIcon
+                                strongSelf.addSubnode(deletedIcon)
+                            }
+                        } else if let deletedIcon = strongSelf.syncGramDeletedIcon {
+                            deletedIcon.removeFromSupernode()
+                            strongSelf.syncGramDeletedIcon = nil
+                        }
+
+                        animation.animator.updateFrame(layer: strongSelf.dateNode.layer, frame: CGRect(origin: CGPoint(x: leftOffset + leftInset + backgroundInsets.left + impressionWidth + syncGramDeletedWidth, y: backgroundInsets.top + 1.0 + offset + verticalInset), size: date.size), completion: nil)
                         
                         if let clockFrameNode = clockFrameNode {
                             let clockPosition = CGPoint(x: leftOffset + backgroundInsets.left + clockPosition.x + reactionInset, y: backgroundInsets.top + clockPosition.y + verticalInset)

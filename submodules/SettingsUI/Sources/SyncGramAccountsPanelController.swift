@@ -426,9 +426,11 @@ public final class SyncGramAccountsPanelController: ViewController {
     }
 
     @objc private func copyUsernameTapped(_ sender: UIButton) {
-        if let hint = sender.accessibilityHint {
-            UIPasteboard.general.string = hint
+        guard let username = sender.accessibilityHint else {
+            return
         }
+        UIPasteboard.general.string = username
+        SyncGramToast.show("Username @\(username) скопирован")
     }
 
     @objc private func addAccountTapped() {

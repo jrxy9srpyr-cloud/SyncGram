@@ -1402,6 +1402,15 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                     return
                 }
                 
+                if peer.id == SyncGramStreamChat.peerId {
+                    // The "Поток" row is not a real chat: show the aggregated feed instead.
+                    self.chatListDisplayNode.mainContainerNode.currentItemNode.clearHighlightAnimated(true)
+                    if let navigationController = self.navigationController as? NavigationController {
+                        navigationController.pushViewController(SyncGramStreamController(context: self.context), animated: true)
+                    }
+                    return
+                }
+                
                 let subject: ChatControllerSubject? = nil
                 
                 var forumSourcePeer: Signal<EnginePeer?, NoError> = .single(nil)
