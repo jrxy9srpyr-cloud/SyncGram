@@ -21,6 +21,9 @@ submodules/AvatarNode/Sources/PeerAvatar.swift
 submodules/ChatListUI/Sources/ChatListController.swift
 submodules/ChatListUI/Sources/ChatListSearchListPaneNode.swift
 submodules/ChatListUI/Sources/Node/ChatListNodeLocation.swift
+submodules/ChatListUI/Sources/SyncGram/SyncGramStreamChat.swift
+submodules/ChatListUI/Sources/SyncGram/SyncGramStreamChatsController.swift
+submodules/ChatListUI/Sources/SyncGram/SyncGramStreamController.swift
 submodules/ChatPresentationInterfaceState/Sources/ChatPresentationInterfaceState.swift
 submodules/DirectMediaImageCache/Sources/DirectMediaImageCache.swift
 submodules/FeaturedStickersScreen/Sources/FeaturedStickersScreen.swift
@@ -46,8 +49,7 @@ submodules/PhotoResources/Sources/PassResources.swift
 submodules/PhotoResources/Sources/PhotoResources.swift
 submodules/PremiumUI/Sources/PremiumIntroScreen.swift
 submodules/SettingsUI/Sources/SyncGramAccountsPanelController.swift
-submodules/SettingsUI/Sources/SyncGramStreamChatsController.swift
-submodules/SettingsUI/Sources/SyncGramStreamController.swift
+submodules/SettingsUI/Sources/SyncGramSessionController.swift
 submodules/SettingsUI/Sources/SyncGramUnreadFeedController.swift
 submodules/ShareController/Sources/ShareController.swift
 submodules/ShareController/Sources/ShareControllerNode.swift
@@ -91,6 +93,7 @@ submodules/TelegramUI/Sources/DocumentPreviewController.swift
 submodules/TelegramUI/Sources/FetchCachedRepresentations.swift
 submodules/TelegramUI/Sources/InChatPrefetchManager.swift
 submodules/TelegramUI/Sources/StoreDownloadedMedia.swift
+submodules/TelegramUI/Sources/SyncGram/SyncGramBackgroundNotifications.swift
 submodules/TelegramUI/Sources/TransformOutgoingMessageMedia.swift
 submodules/TelegramUniversalVideoContent/Sources/HLSVideoContent.swift
 submodules/TelegramUniversalVideoContent/Sources/HLSVideoJSNativeContentNode.swift
