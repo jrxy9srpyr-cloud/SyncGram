@@ -124,6 +124,7 @@ public final class SyncGramCacheController: ViewController {
 
             NSLayoutConstraint.activate([
                 title.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 12.0),
+                title.trailingAnchor.constraint(lessThanOrEqualTo: check.leadingAnchor, constant: -8.0),
                 title.centerYAnchor.constraint(equalTo: button.centerYAnchor),
                 check.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -12.0),
                 check.centerYAnchor.constraint(equalTo: button.centerYAnchor),
@@ -175,6 +176,7 @@ public final class SyncGramCacheController: ViewController {
             self.stackView.insertArrangedSubview(button, at: index)
             index += 1
         }
+        self.view.setNeedsLayout()
     }
 
     private func categoryTag(_ category: StorageUsageStats.CategoryKey) -> Int {
@@ -254,8 +256,9 @@ public final class SyncGramCacheController: ViewController {
         let insets = self.view.safeAreaInsets
         let width = bounds.width - 40.0
         self.titleLabel.frame = CGRect(x: 20.0, y: insets.top + 16.0, width: width, height: 28.0)
-        self.subtitleLabel.frame = CGRect(x: 20.0, y: insets.top + 50.0, width: width, height: 52.0)
-        let top = insets.top + 110.0
+        let subtitleHeight = self.subtitleLabel.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+        self.subtitleLabel.frame = CGRect(x: 20.0, y: insets.top + 50.0, width: width, height: subtitleHeight)
+        let top = insets.top + 50.0 + subtitleHeight + 14.0
         self.scrollView.frame = CGRect(x: 20.0, y: top, width: width, height: bounds.height - top - insets.bottom - 16.0)
         let height = self.stackView.systemLayoutSizeFitting(CGSize(width: width, height: .greatestFiniteMagnitude)).height
         self.stackView.frame = CGRect(x: 0.0, y: 0.0, width: width, height: height)

@@ -202,7 +202,7 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
                 arguments.openChatListSize()
             })
         case .localPremium:
-            return ItemListDisclosureItem(presentationData: presentationData, title: "Локальный премиум", label: "Список функций", sectionId: self.section, style: .blocks, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Локальный премиум", label: SyncGramSettings.localPremiumEnabled ? "Активно" : "Не активно", sectionId: self.section, style: .blocks, action: {
                 arguments.openLocalPremium()
             })
         case let .securityQuestion(value):
@@ -274,6 +274,20 @@ private func syncGramSettingsEntries(signingInfoText: String) -> [SyncGramSettin
     ]
 }
 
+private func syncGramPresentReadAllConfirmation() {
+    guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+        return
+    }
+    let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first
+    var controller = window?.rootViewController
+    while let presented = controller?.presentedViewController {
+        controller = presented
+    }
+    let alert = UIAlertController(title: "Готово", message: "Все чаты отмечены как прочитанные.", preferredStyle: .alert)
+    alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+    controller?.present(alert, animated: true, completion: nil)
+}
+
 public func syncGramSettingsController(context: AccountContext) -> ViewController {
     let revision = ValuePromise<Int>(0, ignoreRepeated: false)
 
@@ -291,6 +305,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
             SyncGramSettings.ghostModeEnabled = value
         case .hideOnline:
             SyncGramSettings.hideOnlineStatusEnabled = value
+            NotificationCenter.default.post(name: Notification.Name("SyncGramHideOnlineChanged"), object: nil)
         case .hideReads:
             SyncGramSettings.hideReadReceiptsEnabled = value
         case .hideTyping:
@@ -331,7 +346,11 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     }, openStream: {
         openStreamImpl?()
     }, readAllChats: {
-        let _ = context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: .root, filterPredicate: nil)]).startStandalone()
+        let _ = context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: .root, filterPredicate: nil)]).startStandalone(completed: {
+            Queue.mainQueue().justDispatch {
+                syncGramPresentReadAllConfirmation()
+            }
+        })
     })
 
     let signal = combineLatest(queue: .mainQueue(),

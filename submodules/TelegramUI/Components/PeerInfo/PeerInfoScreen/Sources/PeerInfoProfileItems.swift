@@ -909,7 +909,7 @@ func infoItems(
     
     if let peer = data.peer, peer.id != context.account.peerId {
         let isLocked = SyncGramChatLock.shared.isLocked(peer.id)
-        items[.peerSettings]!.append(PeerInfoScreenActionItem(id: "SyncGramChatLock", text: isLocked ? "Разблокировать чат" : "Заблокировать чат", color: isLocked ? .destructive : .accent, action: {
+        items[.peerSettings]!.append(PeerInfoScreenActionItem(id: "SyncGramChatLock", text: isLocked ? "Разблокировать чат" : "Заблокировать чат", color: isLocked ? .destructive : .accent, alignment: .center, action: {
             SyncGramChatLock.shared.setLocked(peer.id, locked: !isLocked)
         }))
     }

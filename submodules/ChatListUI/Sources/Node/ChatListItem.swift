@@ -2024,7 +2024,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 }
             }
             
-            var avatarDiameter = min(60.0, floor(item.presentationData.fontSize.baseDisplaySize * 60.0 / 17.0))
+            var avatarDiameter = min(60.0, floor(item.presentationData.syncGramScaledBaseFontSize * 60.0 / 17.0))
             
             if case let .peer(peerData) = item.content, let customMessageListData = peerData.customMessageListData, customMessageListData.commandPrefix != nil {
                 avatarDiameter = 40.0
@@ -2286,12 +2286,12 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
         let currentCustomTextEntities = self.cachedCustomTextEntities
         
         return { [weak self] item, params, first, last, firstWithHeader, nextIsPinned, nextHasActiveRevealControls in
-            let titleFont = Font.semibold(floor(item.presentationData.fontSize.itemListBaseFontSize * 16.0 / 17.0))
-            let textFont = Font.regular(floor(item.presentationData.fontSize.itemListBaseFontSize * 15.0 / 17.0))
-            let italicTextFont = Font.italic(floor(item.presentationData.fontSize.itemListBaseFontSize * 15.0 / 17.0))
-            let dateFont = Font.regular(floor(item.presentationData.fontSize.itemListBaseFontSize * 14.0 / 17.0))
-            let badgeFont = Font.with(size: floor(item.presentationData.fontSize.itemListBaseFontSize * 12.0 / 17.0), design: .regular, weight: .semibold, traits: [.monospacedNumbers])
-            let avatarBadgeFont = Font.with(size: floor(item.presentationData.fontSize.itemListBaseFontSize * 16.0 / 17.0), design: .regular, weight: .regular, traits: [.monospacedNumbers])
+            let titleFont = Font.semibold(floor(item.presentationData.syncGramScaledBaseFontSize * 16.0 / 17.0))
+            let textFont = Font.regular(floor(item.presentationData.syncGramScaledBaseFontSize * 15.0 / 17.0))
+            let italicTextFont = Font.italic(floor(item.presentationData.syncGramScaledBaseFontSize * 15.0 / 17.0))
+            let dateFont = Font.regular(floor(item.presentationData.syncGramScaledBaseFontSize * 14.0 / 17.0))
+            let badgeFont = Font.with(size: floor(item.presentationData.syncGramScaledBaseFontSize * 12.0 / 17.0), design: .regular, weight: .semibold, traits: [.monospacedNumbers])
+            let avatarBadgeFont = Font.with(size: floor(item.presentationData.syncGramScaledBaseFontSize * 16.0 / 17.0), design: .regular, weight: .regular, traits: [.monospacedNumbers])
             
             let account = item.context.account
             var messages: [EngineMessage]
@@ -2556,7 +2556,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
             let enableChatListPhotos = true
             
             // if changed, adjust setupItem accordingly
-            var avatarDiameter = min(60.0, floor(item.presentationData.fontSize.baseDisplaySize * 60.0 / 17.0))
+            var avatarDiameter = min(60.0, floor(item.presentationData.syncGramScaledBaseFontSize * 60.0 / 17.0))
             let avatarLeftEdgeInset: CGFloat = item.useCommunityViewLayout ? 10.0 : 16.0
             let avatarLeftInset: CGFloat
             
@@ -2575,9 +2575,9 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 }
             }
             
-            let badgeDiameter = floor(item.presentationData.fontSize.baseDisplaySize * 20.0 / 17.0)
-            let avatarBadgeDiameter: CGFloat = floor(floor(item.presentationData.fontSize.itemListBaseFontSize * 22.0 / 17.0))
-            let avatarTimerBadgeDiameter: CGFloat = floor(floor(item.presentationData.fontSize.itemListBaseFontSize * 24.0 / 17.0))
+            let badgeDiameter = floor(item.presentationData.syncGramScaledBaseFontSize * 20.0 / 17.0)
+            let avatarBadgeDiameter: CGFloat = floor(floor(item.presentationData.syncGramScaledBaseFontSize * 22.0 / 17.0))
+            let avatarTimerBadgeDiameter: CGFloat = floor(floor(item.presentationData.syncGramScaledBaseFontSize * 24.0 / 17.0))
             
             let currentAvatarBadgeCleanBackgroundImage: UIImage? = PresentationResourcesChatList.badgeBackgroundBorder(item.presentationData.theme, diameter: avatarBadgeDiameter + 4.0)
             
@@ -2673,7 +2673,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
             var chatListQuoteSearchResult: CachedChatListSearchResult?
             var customTextEntities: CachedCustomTextEntities?
             
-            let contentImageSide: CGFloat = max(10.0, min(20.0, floor(item.presentationData.fontSize.baseDisplaySize * 18.0 / 17.0)))
+            let contentImageSide: CGFloat = max(10.0, min(20.0, floor(item.presentationData.syncGramScaledBaseFontSize * 18.0 / 17.0)))
             let contentImageSize = CGSize(width: contentImageSide, height: contentImageSide)
             let contentImageSpacing: CGFloat = 2.0
             let forwardedIconSpacing: CGFloat = 6.0
@@ -3010,7 +3010,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                         
                         if case let .peer(peerData) = item.content, let customMessageListData = peerData.customMessageListData, let commandPrefix = customMessageListData.commandPrefix {
                             let mutableAttributedText = NSMutableAttributedString(attributedString: attributedText)
-                            let boldTextFont = Font.semibold(floor(item.presentationData.fontSize.itemListBaseFontSize * 15.0 / 17.0))
+                            let boldTextFont = Font.semibold(floor(item.presentationData.syncGramScaledBaseFontSize * 15.0 / 17.0))
                             mutableAttributedText.insert(NSAttributedString(string: commandPrefix + " ", font: boldTextFont, textColor: theme.titleColor), at: 0)
                             if let searchQuery = customMessageListData.searchQuery {
                                 let range = (mutableAttributedText.string as NSString).range(of: searchQuery)
@@ -3255,7 +3255,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
             default:
                 break
             }
-            let messageTypeIconScale = min(1.0, item.presentationData.fontSize.itemListBaseFontSize / 17.0)
+            let messageTypeIconScale = min(1.0, item.presentationData.syncGramScaledBaseFontSize / 17.0)
             
             if let currentMessageTypeIcon {
                 textLeftCutout += currentMessageTypeIcon.size.width * messageTypeIconScale
@@ -3680,7 +3680,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
             
             var actionButtonTitleNodeLayoutAndApply: (TextNodeLayout, () -> TextNode)?
             if !item.editing, case .none = badgeContent, case .none = mentionBadgeContent, case let .chat(itemPeer) = contentPeer, case let .user(user) = itemPeer.chatMainPeer, let botInfo = user.botInfo, botInfo.flags.contains(.hasWebApp) {
-                actionButtonTitleNodeLayoutAndApply = makeActionButtonTitleNodeLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: item.presentationData.strings.ChatList_InlineButtonOpenApp, font: Font.semibold(floor(item.presentationData.fontSize.itemListBaseFontSize * 15.0 / 17.0)), textColor: theme.unreadBadgeActiveTextColor), backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: CGSize(width: rawContentWidth, height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
+                actionButtonTitleNodeLayoutAndApply = makeActionButtonTitleNodeLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: item.presentationData.strings.ChatList_InlineButtonOpenApp, font: Font.semibold(floor(item.presentationData.syncGramScaledBaseFontSize * 15.0 / 17.0)), textColor: theme.unreadBadgeActiveTextColor), backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: CGSize(width: rawContentWidth, height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
             }
             
             var badgeSize: CGFloat = 0.0
@@ -3816,7 +3816,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 textMaxWidth -= 18.0
             }
             
-            let textLineSpacing: CGFloat = min(0.2, item.presentationData.fontSize.itemListBaseFontSize * 0.2 / 17.0)
+            let textLineSpacing: CGFloat = min(0.2, item.presentationData.syncGramScaledBaseFontSize * 0.2 / 17.0)
             let (textLayout, textApply) = textLayout(TextNodeLayoutArguments(
                 attributedString: textAttributedString,
                 backgroundColor: nil,
@@ -4051,15 +4051,14 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 itemHeight += authorSpacing
             }
                         
-            let rawContentRect = CGRect(origin: CGPoint(x: 2.0, y: layoutOffset + floor(item.presentationData.fontSize.itemListBaseFontSize * 8.0 / 17.0)), size: CGSize(width: rawContentWidth, height: itemHeight - 12.0 - 9.0))
+            let rawContentRect = CGRect(origin: CGPoint(x: 2.0, y: layoutOffset + floor(item.presentationData.syncGramScaledBaseFontSize * 8.0 / 17.0)), size: CGSize(width: rawContentWidth, height: itemHeight - 12.0 - 9.0))
             
             let insets = ChatListItemNode.insets(first: first, last: last, firstWithHeader: firstWithHeader)
             var heightOffset: CGFloat = 0.0
             if item.hiddenOffset {
                 heightOffset = -itemHeight
             }
-            let syncGramScale = CGFloat(SyncGramSettings.chatListScale)
-            let layout = ListViewItemNodeLayout(contentSize: CGSize(width: params.width, height: max(0.0, itemHeight * syncGramScale + heightOffset)), insets: insets)
+            let layout = ListViewItemNodeLayout(contentSize: CGSize(width: params.width, height: max(0.0, itemHeight + heightOffset)), insets: insets)
             
             var customActions: [ChatListItemAccessibilityCustomAction] = []
             for option in peerLeftRevealOptions {
@@ -4075,7 +4074,6 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     strongSelf.nextHasActiveRevealControls = nextHasActiveRevealControls
                     strongSelf.currentItemHeight = itemHeight
                     strongSelf.layer.anchorPoint = CGPoint(x: 0.5, y: 0.0)
-                    strongSelf.layer.transform = CATransform3DMakeScale(syncGramScale, syncGramScale, 1.0)
                     strongSelf.cachedChatListText = chatListText
                     strongSelf.cachedChatListSearchResult = chatListSearchResult
                     strongSelf.cachedChatListQuoteSearchResult = chatListQuoteSearchResult
@@ -4093,7 +4091,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     }
                                        
                     if case .groupReference = item.content {
-                        strongSelf.layer.sublayerTransform = CATransform3DMakeTranslation(0.0, (layout.contentSize.height - itemHeight) / max(0.1, syncGramScale), 0.0)
+                        strongSelf.layer.sublayerTransform = CATransform3DIdentity
                     }
                     
                     if let _ = updatedTheme {
@@ -4212,7 +4210,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     var avatarScaleOffset: CGFloat = 0.0
                     var avatarScale: CGFloat = 1.0
                     if let inlineNavigationLocation = item.interaction.inlineNavigationLocation {
-                        let targetAvatarScale: CGFloat = floor(item.presentationData.fontSize.itemListBaseFontSize * 54.0 / 17.0) / avatarFrame.width
+                        let targetAvatarScale: CGFloat = floor(item.presentationData.syncGramScaledBaseFontSize * 54.0 / 17.0) / avatarFrame.width
                         avatarScale = targetAvatarScale * inlineNavigationLocation.progress + 1.0 * (1.0 - inlineNavigationLocation.progress)
                         
                         let targetAvatarScaleOffset: CGFloat = -(avatarFrame.width - avatarFrame.width * avatarScale) * 0.5
@@ -4617,10 +4615,10 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     statusX += -dateLayout.size.width - statusSize.width - statusOffset
                     
                     strongSelf.statusNode.frame = CGRect(origin: CGPoint(x: statusX, y: contentRect.origin.y + 2.0 - UIScreenPixel + floor((dateLayout.size.height - statusSize.height) / 2.0)), size: statusSize)
-                    strongSelf.statusNode.fontSize = item.presentationData.fontSize.itemListBaseFontSize
+                    strongSelf.statusNode.fontSize = item.presentationData.syncGramScaledBaseFontSize
                     let _ = strongSelf.statusNode.transitionToState(statusState, animated: animateContent)
                     
-                    let rightAccessoryVerticalOffset: CGFloat = floorToScreenPixels(-4.0 * min(1.0, item.presentationData.fontSize.itemListBaseFontSize / 17.0))
+                    let rightAccessoryVerticalOffset: CGFloat = floorToScreenPixels(-4.0 * min(1.0, item.presentationData.syncGramScaledBaseFontSize / 17.0))
                     var nextBadgeX: CGFloat = contentRect.maxX
                     if let _ = currentBadgeBackgroundImage {
                         let badgeFrame = CGRect(x: nextBadgeX - badgeLayout.width, y: contentRect.maxY - badgeLayout.height + rightAccessoryVerticalOffset, width: badgeLayout.width, height: badgeLayout.height)
@@ -4661,13 +4659,13 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     }
                     
                     if let (actionButtonTitleNodeLayout, apply) = actionButtonTitleNodeLayoutAndApply {
-                        let actionButtonSideInset = floor(item.presentationData.fontSize.itemListBaseFontSize * 12.0 / 17.0)
-                        let actionButtonTopInset = floor(item.presentationData.fontSize.itemListBaseFontSize * 5.0 / 17.0)
-                        let actionButtonBottomInset = floor(item.presentationData.fontSize.itemListBaseFontSize * 4.0 / 17.0)
+                        let actionButtonSideInset = floor(item.presentationData.syncGramScaledBaseFontSize * 12.0 / 17.0)
+                        let actionButtonTopInset = floor(item.presentationData.syncGramScaledBaseFontSize * 5.0 / 17.0)
+                        let actionButtonBottomInset = floor(item.presentationData.syncGramScaledBaseFontSize * 4.0 / 17.0)
                         
                         let actionButtonSize = CGSize(width: actionButtonTitleNodeLayout.size.width + actionButtonSideInset * 2.0, height: actionButtonTitleNodeLayout.size.height + actionButtonTopInset + actionButtonBottomInset)
                         var actionButtonFrame = CGRect(x: nextBadgeX - actionButtonSize.width, y: contentRect.minY + floor((contentRect.height - actionButtonSize.height) * 0.5), width: actionButtonSize.width, height: actionButtonSize.height)
-                        actionButtonFrame.origin.y = max(actionButtonFrame.origin.y, dateFrame.maxY + floor(item.presentationData.fontSize.itemListBaseFontSize * 4.0 / 17.0))
+                        actionButtonFrame.origin.y = max(actionButtonFrame.origin.y, dateFrame.maxY + floor(item.presentationData.syncGramScaledBaseFontSize * 4.0 / 17.0))
                         actionButtonFrame.origin.y += 4.0
                         
                         let actionButtonNode: HighlightableButtonNode
@@ -4949,7 +4947,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     }
                     
                     if !itemTags.isEmpty {
-                        let sizeFactor = item.presentationData.fontSize.itemListBaseFontSize / 17.0
+                        let sizeFactor = item.presentationData.syncGramScaledBaseFontSize / 17.0
                         
                         let itemTagListFrame = CGRect(origin: CGPoint(x: contentRect.minX, y: contentRect.minY + measureLayout.size.height * 2.0 + floorToScreenPixels(2.0 * sizeFactor)), size: CGSize(width: contentRect.width, height: floorToScreenPixels(20.0 * sizeFactor)))
                         

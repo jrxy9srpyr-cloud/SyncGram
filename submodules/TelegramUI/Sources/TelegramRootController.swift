@@ -144,6 +144,9 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     }
     
     deinit {
+        if let observer = self.syncGramNavigationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
         self.permissionsDisposable?.dispose()
         self.presentationDataDisposable?.dispose()
         self.applicationInFocusDisposable?.dispose()
@@ -226,7 +229,21 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         return result
     }
 
+    private var syncGramNavigationObserver: NSObjectProtocol?
+    private var syncGramShowCallsTab: Bool = true
+    private var syncGramShowNewsTab: Bool = true
+
     public func addRootControllers(showCallsTab: Bool, showNewsTab: Bool) {
+        self.syncGramShowCallsTab = showCallsTab
+        self.syncGramShowNewsTab = showNewsTab
+        if self.syncGramNavigationObserver == nil {
+            self.syncGramNavigationObserver = NotificationCenter.default.addObserver(forName: Notification.Name("SyncGramNavigationChanged"), object: nil, queue: .main, using: { [weak self] _ in
+                guard let self else {
+                    return
+                }
+                self.updateRootControllers(showCallsTab: self.syncGramShowCallsTab, showNewsTab: self.syncGramShowNewsTab)
+            })
+        }
         let tabBarController = TabBarControllerImpl(theme: self.presentationData.theme, strings: self.presentationData.strings)
         tabBarController.navigationPresentation = .master
         let chatListController = self.context.sharedContext.makeChatListController(context: self.context, location: .chatList(groupId: .root), controlsHistoryPreload: true, hideNetworkActivityStatus: false, previewing: false, enableDebugActions: !GlobalExperimentalSettings.isAppStoreBuild)
@@ -295,6 +312,8 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     }
         
     public func updateRootControllers(showCallsTab: Bool, showNewsTab: Bool) {
+        self.syncGramShowCallsTab = showCallsTab
+        self.syncGramShowNewsTab = showNewsTab
         guard let rootTabController = self.rootTabController as? TabBarControllerImpl else {
             return
         }

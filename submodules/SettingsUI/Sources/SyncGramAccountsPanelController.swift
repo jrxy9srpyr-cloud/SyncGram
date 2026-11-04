@@ -295,6 +295,7 @@ public final class SyncGramAccountsPanelController: ViewController {
             self.stackView.insertArrangedSubview(container, at: insertionIndex)
             insertionIndex += 1
         }
+        self.view.setNeedsLayout()
     }
 
     @objc private func accountTapped(_ sender: UIControl) {
@@ -409,9 +410,10 @@ public final class SyncGramAccountsPanelController: ViewController {
         let top = insets.top + 16.0
 
         self.titleLabel.frame = CGRect(x: 20.0, y: top, width: width, height: 28.0)
-        self.subtitleLabel.frame = CGRect(x: 20.0, y: top + 34.0, width: width, height: 40.0)
+        let subtitleHeight = self.subtitleLabel.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+        self.subtitleLabel.frame = CGRect(x: 20.0, y: top + 34.0, width: width, height: subtitleHeight)
 
-        let scrollTop = top + 88.0
+        let scrollTop = top + 34.0 + subtitleHeight + 14.0
         self.scrollView.frame = CGRect(x: 20.0, y: scrollTop, width: width, height: bounds.height - scrollTop - insets.bottom - 16.0)
         let height = self.stackView.systemLayoutSizeFitting(CGSize(width: width, height: .greatestFiniteMagnitude)).height
         self.stackView.frame = CGRect(x: 0.0, y: 0.0, width: width, height: height)

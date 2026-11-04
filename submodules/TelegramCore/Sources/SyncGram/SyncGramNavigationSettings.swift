@@ -53,6 +53,11 @@ public final class SyncGramNavigationSettings {
 
     public func placement(for tab: SyncGramTabId) -> SyncGramTabPlacement {
         if let raw = self.placements[tab.rawValue], let value = SyncGramTabPlacement(rawValue: raw) {
+            // "Top" tabs are not rendered by the tab bar; treat them as bottom tabs instead of
+            // silently hiding the tab.
+            if value == .top {
+                return .bottom
+            }
             return value
         }
         switch tab {

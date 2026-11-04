@@ -40,7 +40,7 @@ public final class SyncGramNavigationController: ViewController {
         self.titleLabel.textColor = theme.list.itemPrimaryTextColor
         self.view.addSubview(self.titleLabel)
 
-        self.descriptionLabel.text = "Выбери, где находится вкладка: снизу, сверху, доступна свайпом или скрыта. Изменения применяются после перезапуска вкладок."
+        self.descriptionLabel.text = "Выбери, где находится вкладка: снизу, доступна свайпом или скрыта. Изменения применяются сразу."
         self.descriptionLabel.font = Font.regular(14.0)
         self.descriptionLabel.textColor = theme.list.itemSecondaryTextColor
         self.descriptionLabel.numberOfLines = 0
@@ -64,7 +64,7 @@ public final class SyncGramNavigationController: ViewController {
             label.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(label)
 
-            let control = UISegmentedControl(items: ["Снизу", "Сверху", "Свайп", "Скрыть"])
+            let control = UISegmentedControl(items: ["Снизу", "Свайп", "Скрыть"])
             control.selectedSegmentIndex = Self.index(for: SyncGramNavigationSettings.shared.placement(for: tab))
             control.tag = SyncGramTabId.allCases.firstIndex(of: tab) ?? 0
             control.addTarget(self, action: #selector(self.segmentChanged(_:)), for: .valueChanged)
@@ -87,24 +87,20 @@ public final class SyncGramNavigationController: ViewController {
 
     private static func index(for placement: SyncGramTabPlacement) -> Int {
         switch placement {
-        case .bottom:
+        case .bottom, .top:
             return 0
-        case .top:
-            return 1
         case .swipe:
-            return 2
+            return 1
         case .hidden:
-            return 3
+            return 2
         }
     }
 
     private static func placement(for index: Int) -> SyncGramTabPlacement {
         switch index {
         case 1:
-            return .top
-        case 2:
             return .swipe
-        case 3:
+        case 2:
             return .hidden
         default:
             return .bottom
@@ -117,6 +113,7 @@ public final class SyncGramNavigationController: ViewController {
         }
         let tab = SyncGramTabId.allCases[sender.tag]
         SyncGramNavigationSettings.shared.setPlacement(Self.placement(for: sender.selectedSegmentIndex), for: tab)
+        NotificationCenter.default.post(name: Notification.Name("SyncGramNavigationChanged"), object: nil)
     }
 
     override public func viewDidLayoutSubviews() {
@@ -128,9 +125,10 @@ public final class SyncGramNavigationController: ViewController {
         let top = insets.top + 16.0
 
         self.titleLabel.frame = CGRect(x: 20.0, y: top, width: width, height: 28.0)
-        self.descriptionLabel.frame = CGRect(x: 20.0, y: top + 34.0, width: width, height: 58.0)
+        let descriptionHeight = self.descriptionLabel.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+        self.descriptionLabel.frame = CGRect(x: 20.0, y: top + 34.0, width: width, height: descriptionHeight)
 
-        let scrollTop = top + 102.0
+        let scrollTop = top + 34.0 + descriptionHeight + 14.0
         self.scrollView.frame = CGRect(x: 20.0, y: scrollTop, width: width, height: bounds.height - scrollTop - insets.bottom - 16.0)
         let height = self.stackView.systemLayoutSizeFitting(CGSize(width: width, height: .greatestFiniteMagnitude)).height
         self.stackView.frame = CGRect(x: 0.0, y: 0.0, width: width, height: height)

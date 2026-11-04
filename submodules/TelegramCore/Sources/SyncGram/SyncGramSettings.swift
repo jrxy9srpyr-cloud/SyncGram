@@ -18,6 +18,7 @@ public enum SyncGramSettings {
         static let deletedNotifications = "syncgram.deletedNotifications"
         static let signingNotifications = "syncgram.signingNotifications"
         static let chatListScale = "syncgram.chatListScale"
+        static let localPremium = "syncgram.localPremium"
     }
 
     private static var defaults: UserDefaults {
@@ -97,6 +98,12 @@ public enum SyncGramSettings {
             return defaults.bool(forKey: Key.signingNotifications)
         }
         set { defaults.set(newValue, forKey: Key.signingNotifications) }
+    }
+
+    /// Local cosmetic "premium" state. It does not change the Telegram account in any way.
+    public static var localPremiumEnabled: Bool {
+        get { return defaults.bool(forKey: Key.localPremium) }
+        set { defaults.set(newValue, forKey: Key.localPremium) }
     }
 
     /// 1.0 is the system size. Values below 1.0 make the chat list more compact.

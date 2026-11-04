@@ -103,6 +103,7 @@ public final class SyncGramUnreadFeedController: UIViewController {
             label.textAlignment = .center
             label.frame = CGRect(x: 0.0, y: 20.0, width: self.view.bounds.width - 40.0, height: 40.0)
             self.stackView.addArrangedSubview(label)
+            self.view.setNeedsLayout()
             return
         }
 
@@ -140,6 +141,7 @@ public final class SyncGramUnreadFeedController: UIViewController {
             button.addTarget(self, action: #selector(self.itemTapped(_:)), for: .touchUpInside)
             self.stackView.addArrangedSubview(button)
         }
+        self.view.setNeedsLayout()
     }
 
     @objc private func itemTapped(_ sender: UIControl) {

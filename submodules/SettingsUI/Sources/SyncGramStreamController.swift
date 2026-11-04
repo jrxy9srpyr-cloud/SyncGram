@@ -25,6 +25,7 @@ public final class SyncGramStreamController: ViewController {
     private let scrollView: UIScrollView
     private let stackView: UIStackView
     private let disposable = MetaDisposable()
+    private var currentItems: [SyncGramStreamItem] = []
 
     public init(context: AccountContext) {
         self.context = context
@@ -118,6 +119,7 @@ public final class SyncGramStreamController: ViewController {
             label.textColor = theme.list.itemSecondaryTextColor
             label.textAlignment = .center
             self.stackView.addArrangedSubview(label)
+            self.view.setNeedsLayout()
             return
         }
 
@@ -129,21 +131,23 @@ public final class SyncGramStreamController: ViewController {
             label.textColor = theme.list.itemSecondaryTextColor
             label.textAlignment = .center
             self.stackView.addArrangedSubview(label)
+            self.view.setNeedsLayout()
             return
         }
 
         let timeFormatter = DateFormatter()
         timeFormatter.dateFormat = "HH:mm"
 
-        for item in filtered.prefix(120) {
-            let button = UIControl()
-            button.backgroundColor = theme.list.itemBlocksBackgroundColor
-            button.layer.cornerRadius = 10.0
-            button.tag = Int(item.accountId.int64)
-            button.accessibilityHint = "\(item.peerId.toInt64())"
+        self.currentItems = Array(filtered.prefix(120))
+        for (index, item) in self.currentItems.enumerated() {
+            let container = UIControl()
+            container.backgroundColor = theme.list.itemBlocksBackgroundColor
+            container.layer.cornerRadius = 12.0
+            container.tag = index
+            container.addTarget(self, action: #selector(self.itemTapped(_:)), for: .touchUpInside)
 
             let title = UILabel()
-            title.text = "\(item.chatTitle)"
+            title.text = item.chatTitle
             title.font = Font.semibold(15.0)
             title.textColor = theme.list.itemPrimaryTextColor
 
@@ -158,25 +162,43 @@ public final class SyncGramStreamController: ViewController {
             text.textColor = theme.list.itemSecondaryTextColor
             text.numberOfLines = 3
 
-            for view in [title, account, text] {
+            let jump = UIButton(type: .system)
+            jump.setTitle("Перейти к сообщению", for: .normal)
+            jump.setTitleColor(theme.list.itemAccentColor, for: .normal)
+            jump.titleLabel?.font = Font.semibold(12.0)
+            jump.tag = index
+            jump.addTarget(self, action: #selector(self.jumpTapped(_:)), for: .touchUpInside)
+
+            for view in [title, account, text, jump] {
                 view.translatesAutoresizingMaskIntoConstraints = false
-                button.addSubview(view)
+                container.addSubview(view)
             }
             NSLayoutConstraint.activate([
-                title.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 12.0),
-                title.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -12.0),
-                title.topAnchor.constraint(equalTo: button.topAnchor, constant: 9.0),
+                title.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12.0),
+                title.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12.0),
+                title.topAnchor.constraint(equalTo: container.topAnchor, constant: 9.0),
                 account.leadingAnchor.constraint(equalTo: title.leadingAnchor),
                 account.trailingAnchor.constraint(equalTo: title.trailingAnchor),
                 account.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 1.0),
                 text.leadingAnchor.constraint(equalTo: title.leadingAnchor),
                 text.trailingAnchor.constraint(equalTo: title.trailingAnchor),
                 text.topAnchor.constraint(equalTo: account.bottomAnchor, constant: 3.0),
-                text.bottomAnchor.constraint(equalTo: button.bottomAnchor, constant: -9.0)
+                jump.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12.0),
+                jump.topAnchor.constraint(equalTo: text.bottomAnchor, constant: 4.0),
+                jump.heightAnchor.constraint(equalToConstant: 26.0),
+                jump.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -6.0)
             ])
-            button.addTarget(self, action: #selector(self.itemTapped(_:)), for: .touchUpInside)
-            self.stackView.addArrangedSubview(button)
+            self.stackView.addArrangedSubview(container)
         }
+        self.view.setNeedsLayout()
+    }
+
+    @objc private func jumpTapped(_ sender: UIButton) {
+        guard sender.tag >= 0 && sender.tag < self.currentItems.count else {
+            return
+        }
+        let item = self.currentItems[sender.tag]
+        self.context.sharedContext.navigateToChat(accountId: item.accountId, peerId: item.peerId, messageId: item.messageId)
     }
 
     @objc private func selectChatsTapped() {
@@ -184,11 +206,11 @@ public final class SyncGramStreamController: ViewController {
     }
 
     @objc private func itemTapped(_ sender: UIControl) {
-        let accountId = AccountRecordId(rawValue: Int64(sender.tag))
-        guard let peerValue = sender.accessibilityHint, let peerIdValue = Int64(peerValue) else {
+        guard sender.tag >= 0 && sender.tag < self.currentItems.count else {
             return
         }
-        self.context.sharedContext.navigateToChat(accountId: accountId, peerId: EnginePeer.Id(peerIdValue), messageId: nil)
+        let item = self.currentItems[sender.tag]
+        self.context.sharedContext.navigateToChat(accountId: item.accountId, peerId: item.peerId, messageId: item.messageId)
     }
 
     override public func viewDidLayoutSubviews() {
@@ -197,8 +219,9 @@ public final class SyncGramStreamController: ViewController {
         let insets = self.view.safeAreaInsets
         let width = bounds.width - 40.0
         self.titleLabel.frame = CGRect(x: 20.0, y: insets.top + 16.0, width: width, height: 28.0)
-        self.subtitleLabel.frame = CGRect(x: 20.0, y: insets.top + 50.0, width: width, height: 44.0)
-        let top = insets.top + 102.0
+        let subtitleHeight = self.subtitleLabel.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+        self.subtitleLabel.frame = CGRect(x: 20.0, y: insets.top + 50.0, width: width, height: subtitleHeight)
+        let top = insets.top + 50.0 + subtitleHeight + 14.0
         self.scrollView.frame = CGRect(x: 20.0, y: top, width: width, height: bounds.height - top - insets.bottom - 16.0)
         let height = self.stackView.systemLayoutSizeFitting(CGSize(width: width, height: .greatestFiniteMagnitude)).height
         self.stackView.frame = CGRect(x: 0.0, y: 0.0, width: width, height: height)

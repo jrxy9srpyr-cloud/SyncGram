@@ -335,6 +335,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     let messageActionCallbackDisposable = MetaDisposable()
     let messageActionUrlAuthDisposable = MetaDisposable()
     let editMessageDisposable = MetaDisposable()
+    private var syncGramLockOverlay: UIView?
     let editMessageErrorsDisposable = MetaDisposable()
     let enqueueMediaMessageDisposable = MetaDisposable()
     var resolvePeerByNameDisposable: MetaDisposable?
@@ -7672,6 +7673,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         super.viewWillAppear(animated)
 
         self.walletTransferAnimationsVisible = true
+        self.syncGramPresentChatLockIfNeeded()
         self.chatDisplayNode.historyNode.forEachVisibleMessageItemNode { itemNode in
             itemNode.unreadMessageRangeUpdated()
         }
@@ -7846,24 +7848,6 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         super.viewDidAppear(animated)
         
         self.didAppear = true
-        
-        if let peerId = self.chatLocation.peerId, SyncGramChatLock.shared.isLocked(peerId), !SyncGramChatLock.shared.isUnlocked(peerId) {
-            let overlay = UIView(frame: self.view.bounds)
-            overlay.backgroundColor = self.presentationData.theme.list.plainBackgroundColor
-            overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            self.view.addSubview(overlay)
-            SyncGramChatLock.shared.authenticate(reason: "Разблокировать чат") { [weak self] success in
-                guard let self else {
-                    return
-                }
-                if success {
-                    SyncGramChatLock.shared.markUnlocked(peerId)
-                    overlay.removeFromSuperview()
-                } else {
-                    self.navigationController?.popViewController(animated: true)
-                }
-            }
-        }
         
         self.chatDisplayNode.historyNode.experimentalSnapScrollToItem = false
         self.chatDisplayNode.historyNode.canReadHistory.set(self.computedCanReadHistoryPromise.get())
@@ -10913,6 +10897,156 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         }
         self.presentScheduleTimePicker(selectedTime: message.timestamp, selectedRepeatPeriod: message._asMessage().scheduleRepeatPeriod, completion: completion)
     }
+
+
+    // MARK: - SyncGram chat lock
+
+    private func syncGramPresentChatLockIfNeeded() {
+        guard let peerId = self.chatLocation.peerId, SyncGramChatLock.shared.isLocked(peerId), !SyncGramChatLock.shared.isUnlocked(peerId) else {
+            return
+        }
+        if let overlay = self.syncGramLockOverlay {
+            self.view.bringSubviewToFront(overlay)
+            return
+        }
+
+        let theme = self.presentationData.theme
+        let overlay = UIView(frame: self.view.bounds)
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        overlay.backgroundColor = theme.list.plainBackgroundColor
+
+        let card = UIView()
+        card.backgroundColor = theme.list.itemBlocksBackgroundColor
+        card.layer.cornerRadius = 16.0
+        card.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(card)
+
+        let iconLabel = UILabel()
+        iconLabel.text = "\u{1F512}"
+        iconLabel.font = UIFont.systemFont(ofSize: 40.0)
+        iconLabel.textAlignment = .center
+        iconLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let titleLabel = UILabel()
+        titleLabel.text = "Чат заблокирован"
+        titleLabel.font = Font.semibold(20.0)
+        titleLabel.textColor = theme.list.itemPrimaryTextColor
+        titleLabel.textAlignment = .center
+        titleLabel.numberOfLines = 0
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let messageLabel = UILabel()
+        messageLabel.text = "Разблокируйте прежде чем открыть чат."
+        messageLabel.font = Font.regular(14.0)
+        messageLabel.textColor = theme.list.itemSecondaryTextColor
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let unlockButton = UIButton(type: .system)
+        unlockButton.setTitle("Разблокировать", for: .normal)
+        unlockButton.titleLabel?.font = Font.semibold(16.0)
+        unlockButton.setTitleColor(.white, for: .normal)
+        unlockButton.backgroundColor = theme.list.itemAccentColor
+        unlockButton.layer.cornerRadius = 10.0
+        unlockButton.translatesAutoresizingMaskIntoConstraints = false
+        unlockButton.addAction(UIAction(handler: { [weak self] _ in
+            self?.syncGramAttemptUnlock(peerId: peerId)
+        }), for: .touchUpInside)
+
+        let cancelButton = UIButton(type: .system)
+        cancelButton.setTitle("Назад", for: .normal)
+        cancelButton.titleLabel?.font = Font.regular(15.0)
+        cancelButton.setTitleColor(theme.list.itemSecondaryTextColor, for: .normal)
+        cancelButton.translatesAutoresizingMaskIntoConstraints = false
+        cancelButton.addAction(UIAction(handler: { [weak self] _ in
+            self?.navigationController?.popViewController(animated: true)
+        }), for: .touchUpInside)
+
+        for view in [iconLabel, titleLabel, messageLabel, unlockButton, cancelButton] {
+            card.addSubview(view)
+        }
+
+        NSLayoutConstraint.activate([
+            card.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            card.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+            card.leadingAnchor.constraint(greaterThanOrEqualTo: overlay.leadingAnchor, constant: 32.0),
+            card.trailingAnchor.constraint(lessThanOrEqualTo: overlay.trailingAnchor, constant: -32.0),
+            card.widthAnchor.constraint(lessThanOrEqualToConstant: 320.0),
+
+            iconLabel.topAnchor.constraint(equalTo: card.topAnchor, constant: 24.0),
+            iconLabel.centerXAnchor.constraint(equalTo: card.centerXAnchor),
+            titleLabel.topAnchor.constraint(equalTo: iconLabel.bottomAnchor, constant: 10.0),
+            titleLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20.0),
+            titleLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20.0),
+            messageLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 6.0),
+            messageLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20.0),
+            messageLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20.0),
+            unlockButton.topAnchor.constraint(equalTo: messageLabel.bottomAnchor, constant: 18.0),
+            unlockButton.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20.0),
+            unlockButton.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20.0),
+            unlockButton.heightAnchor.constraint(equalToConstant: 44.0),
+            cancelButton.topAnchor.constraint(equalTo: unlockButton.bottomAnchor, constant: 8.0),
+            cancelButton.centerXAnchor.constraint(equalTo: card.centerXAnchor),
+            cancelButton.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16.0)
+        ])
+
+        self.view.addSubview(overlay)
+        self.syncGramLockOverlay = overlay
+    }
+
+    private func syncGramAttemptUnlock(peerId: PeerId) {
+        SyncGramChatLock.shared.authenticate(reason: "Разблокировать чат") { [weak self] success in
+            guard let self else {
+                return
+            }
+            if success {
+                SyncGramChatLock.shared.markUnlocked(peerId)
+                self.syncGramRemoveChatLock()
+            } else if SyncGramChatLock.shared.hasSecurityQuestion {
+                self.syncGramAskSecurityQuestion(peerId: peerId)
+            }
+        }
+    }
+
+    private func syncGramAskSecurityQuestion(peerId: PeerId) {
+        guard let question = SyncGramChatLock.shared.securityQuestion else {
+            return
+        }
+        let alert = UIAlertController(title: "Контрольный вопрос", message: question, preferredStyle: .alert)
+        alert.addTextField { textField in
+            textField.placeholder = "Ответ"
+            textField.autocapitalizationType = .none
+            textField.autocorrectionType = .no
+        }
+        alert.addAction(UIAlertAction(title: "Отмена", style: .cancel, handler: nil))
+        alert.addAction(UIAlertAction(title: "Разблокировать", style: .default, handler: { [weak self, weak alert] _ in
+            guard let self else {
+                return
+            }
+            let answer = alert?.textFields?.first?.text ?? ""
+            if SyncGramChatLock.shared.verifySecurityAnswer(answer) {
+                SyncGramChatLock.shared.markUnlocked(peerId)
+                self.syncGramRemoveChatLock()
+            } else {
+                let failure = UIAlertController(title: "Неверный ответ", message: "Попробуйте ещё раз.", preferredStyle: .alert)
+                failure.addAction(UIAlertAction(title: "OK", style: .default, handler: { [weak self] _ in
+                    self?.syncGramAskSecurityQuestion(peerId: peerId)
+                }))
+                self.present(failure, animated: true, completion: nil)
+            }
+        }))
+        DispatchQueue.main.async {
+            self.present(alert, animated: true, completion: nil)
+        }
+    }
+
+    private func syncGramRemoveChatLock() {
+        self.syncGramLockOverlay?.removeFromSuperview()
+        self.syncGramLockOverlay = nil
+    }
+
+    // MARK: - End SyncGram chat lock
 
     private func performScheduledEdit(messageId: MessageId, text: String, entities: TextEntitiesMessageAttribute?, richText: RichTextMessageAttribute?, scheduleTime: Int32, repeatPeriod: Int32?) {
         let scheduleInfo = OutgoingScheduleInfoMessageAttribute(scheduleTime: scheduleTime, repeatPeriod: repeatPeriod)
