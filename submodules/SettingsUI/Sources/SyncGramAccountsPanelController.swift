@@ -26,6 +26,95 @@ private struct SyncGramAccountPanelItem {
     let latestMessageId: EngineMessage.Id?
 }
 
+
+private final class SyncGramAccountRowView {
+    let container: UIControl
+    let title: UILabel
+    let username: UILabel
+    let categories: UILabel
+    let lastMessage: UILabel
+    let status: UILabel
+    let actions: UIStackView
+    let openButton: UIButton
+    let copyButton: UIButton
+
+    init(theme: PresentationTheme) {
+        self.container = UIControl()
+        self.title = UILabel()
+        self.username = UILabel()
+        self.categories = UILabel()
+        self.lastMessage = UILabel()
+        self.status = UILabel()
+        self.actions = UIStackView()
+        self.openButton = UIButton(type: .system)
+        self.copyButton = UIButton(type: .system)
+
+        self.container.backgroundColor = theme.list.itemBlocksBackgroundColor
+        self.container.layer.cornerRadius = 12.0
+
+        self.title.font = Font.semibold(17.0)
+        self.title.textColor = theme.list.itemPrimaryTextColor
+        self.title.numberOfLines = 1
+
+        self.username.font = Font.regular(14.0)
+        self.username.textColor = theme.list.itemSecondaryTextColor
+        self.username.numberOfLines = 1
+
+        self.categories.font = Font.regular(13.0)
+        self.categories.textColor = theme.list.itemSecondaryTextColor
+        self.categories.numberOfLines = 1
+
+        self.lastMessage.font = Font.regular(13.0)
+        self.lastMessage.textColor = theme.list.itemSecondaryTextColor
+        self.lastMessage.numberOfLines = 2
+
+        self.status.font = Font.regular(12.0)
+        self.status.textColor = theme.list.itemSecondaryTextColor
+        self.status.numberOfLines = 2
+
+        self.actions.axis = .horizontal
+        self.actions.spacing = 8.0
+
+        self.openButton.setTitle("Открыть непрочитанные", for: .normal)
+        self.openButton.setTitleColor(theme.list.itemAccentColor, for: .normal)
+        self.openButton.titleLabel?.font = Font.semibold(13.0)
+
+        self.copyButton.setTitle("Скопировать username", for: .normal)
+        self.copyButton.setTitleColor(theme.list.itemAccentColor, for: .normal)
+        self.copyButton.titleLabel?.font = Font.regular(13.0)
+
+        self.actions.addArrangedSubview(self.openButton)
+        self.actions.addArrangedSubview(self.copyButton)
+
+        for view in [self.title, self.username, self.categories, self.lastMessage, self.status, self.actions] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            self.container.addSubview(view)
+        }
+
+        NSLayoutConstraint.activate([
+            self.title.leadingAnchor.constraint(equalTo: self.container.leadingAnchor, constant: 14.0),
+            self.title.trailingAnchor.constraint(equalTo: self.container.trailingAnchor, constant: -14.0),
+            self.title.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 12.0),
+            self.username.leadingAnchor.constraint(equalTo: self.title.leadingAnchor),
+            self.username.trailingAnchor.constraint(equalTo: self.title.trailingAnchor),
+            self.username.topAnchor.constraint(equalTo: self.title.bottomAnchor, constant: 2.0),
+            self.categories.leadingAnchor.constraint(equalTo: self.title.leadingAnchor),
+            self.categories.trailingAnchor.constraint(equalTo: self.title.trailingAnchor),
+            self.categories.topAnchor.constraint(equalTo: self.username.bottomAnchor, constant: 2.0),
+            self.lastMessage.leadingAnchor.constraint(equalTo: self.title.leadingAnchor),
+            self.lastMessage.trailingAnchor.constraint(equalTo: self.title.trailingAnchor),
+            self.lastMessage.topAnchor.constraint(equalTo: self.categories.bottomAnchor, constant: 6.0),
+            self.status.leadingAnchor.constraint(equalTo: self.title.leadingAnchor),
+            self.status.trailingAnchor.constraint(equalTo: self.title.trailingAnchor),
+            self.status.topAnchor.constraint(equalTo: self.lastMessage.bottomAnchor, constant: 4.0),
+            self.actions.leadingAnchor.constraint(equalTo: self.title.leadingAnchor),
+            self.actions.trailingAnchor.constraint(lessThanOrEqualTo: self.container.trailingAnchor, constant: -14.0),
+            self.actions.topAnchor.constraint(equalTo: self.status.bottomAnchor, constant: 8.0),
+            self.actions.bottomAnchor.constraint(equalTo: self.container.bottomAnchor, constant: -12.0)
+        ])
+    }
+}
+
 public final class SyncGramAccountsPanelController: ViewController {
     private let context: AccountContext
     private let presentationData: PresentationData
@@ -168,13 +257,10 @@ public final class SyncGramAccountsPanelController: ViewController {
         }))
     }
 
+    private var accountRows: [Int64: SyncGramAccountRowView] = [:]
+
     private func updateItems(_ items: [SyncGramAccountPanelItem]) {
         self.currentItems = items
-        for view in self.stackView.arrangedSubviews {
-            if view !== self.addAccountButton && view !== self.feedButton {
-                view.removeFromSuperview()
-            }
-        }
 
         self.latestById = [:]
         for item in items {
@@ -183,50 +269,54 @@ public final class SyncGramAccountsPanelController: ViewController {
             }
         }
 
-        let theme = self.presentationData.theme
-        var insertionIndex = 0
-        for item in items {
-            let container = UIControl()
-            let colorIndex = SyncGramAccountSettings.shared.colorIndex(for: item.recordId.int64)
-            let accentColors: [UIColor] = [theme.list.itemAccentColor, .systemOrange, .systemGreen, .systemPink, .systemPurple, .systemTeal]
-            container.backgroundColor = theme.list.itemBlocksBackgroundColor
-            container.layer.cornerRadius = 12.0
-            container.layer.borderWidth = colorIndex > 0 ? 2.0 : 0.0
-            container.layer.borderColor = accentColors[min(colorIndex, accentColors.count - 1)].cgColor
-            container.addTarget(self, action: #selector(self.accountTapped(_:)), for: .touchUpInside)
-            container.tag = Int(item.recordId.int64)
+        // Remove rows for accounts that are gone, keep the rest and update them in place so
+        // a refresh (unread counters, status) does not rebuild and flicker the whole list.
+        let ids = Set(items.map({ $0.recordId.int64 }))
+        let staleIds = self.accountRows.keys.filter({ !ids.contains($0) })
+        for id in staleIds {
+            if let row = self.accountRows.removeValue(forKey: id) {
+                row.container.removeFromSuperview()
+            }
+        }
 
-            let longPress = UILongPressGestureRecognizer(target: self, action: #selector(self.accountLongPressed(_:)))
-            longPress.minimumPressDuration = 0.5
-            container.addGestureRecognizer(longPress)
+        let theme = self.presentationData.theme
+        let accentColors: [UIColor] = [theme.list.itemAccentColor, .systemOrange, .systemGreen, .systemPink, .systemPurple, .systemTeal]
+
+        for (index, item) in items.enumerated() {
+            let row: SyncGramAccountRowView
+            if let existing = self.accountRows[item.recordId.int64] {
+                row = existing
+            } else {
+                row = SyncGramAccountRowView(theme: theme)
+                row.container.tag = Int(item.recordId.int64)
+                row.container.addTarget(self, action: #selector(self.accountTapped(_:)), for: .touchUpInside)
+                row.openButton.tag = Int(item.recordId.int64)
+                row.openButton.addTarget(self, action: #selector(self.openUnreadTapped(_:)), for: .touchUpInside)
+                row.copyButton.tag = Int(item.recordId.int64)
+                row.copyButton.addTarget(self, action: #selector(self.copyUsernameTapped(_:)), for: .touchUpInside)
+
+                let longPress = UILongPressGestureRecognizer(target: self, action: #selector(self.accountLongPressed(_:)))
+                longPress.minimumPressDuration = 0.5
+                row.container.addGestureRecognizer(longPress)
+
+                self.accountRows[item.recordId.int64] = row
+                self.stackView.insertArrangedSubview(row.container, at: index)
+            }
+
+            let colorIndex = SyncGramAccountSettings.shared.colorIndex(for: item.recordId.int64)
+            row.container.layer.borderWidth = colorIndex > 0 ? 2.0 : 0.0
+            row.container.layer.borderColor = accentColors[min(colorIndex, accentColors.count - 1)].cgColor
 
             let emoji = SyncGramAccountSettings.shared.emoji(for: item.recordId.int64)
-            let title = UILabel()
-            title.text = emoji.isEmpty ? item.title : "\(emoji) \(item.title)"
-            title.font = Font.semibold(17.0)
-            title.textColor = theme.list.itemPrimaryTextColor
-
-            let username = UILabel()
-            username.text = "@\(item.username ?? "—") · \(item.unreadTotal) непрочитанных"
-            username.font = Font.regular(14.0)
-            username.textColor = theme.list.itemSecondaryTextColor
-
-            let categories = UILabel()
-            categories.text = "\(item.unreadPrivate) личных · \(item.unreadGroups) групп · \(item.unreadChannels) каналов"
-            categories.font = Font.regular(13.0)
-            categories.textColor = theme.list.itemSecondaryTextColor
-
-            let lastMessage = UILabel()
+            row.title.text = emoji.isEmpty ? item.title : "\(emoji) \(item.title)"
+            row.username.text = "@\(item.username ?? "—") · \(item.unreadTotal) непрочитанных"
+            row.categories.text = "\(item.unreadPrivate) личных · \(item.unreadGroups) групп · \(item.unreadChannels) каналов"
             if let lastChatTitle = item.lastChatTitle, let lastMessageText = item.lastMessageText {
-                lastMessage.text = "\(lastChatTitle): \(lastMessageText)"
+                row.lastMessage.text = "\(lastChatTitle): \(lastMessageText)"
             } else {
-                lastMessage.text = "Нет входящих сообщений"
+                row.lastMessage.text = "Нет входящих сообщений"
             }
-            lastMessage.font = Font.regular(13.0)
-            lastMessage.textColor = theme.list.itemSecondaryTextColor
-            lastMessage.numberOfLines = 2
 
-            let status = UILabel()
             let notificationText: String
             if let mutedUntil = item.mutedUntil, mutedUntil > Date() {
                 notificationText = "Заглушены до \(Self.timeFormatter.string(from: mutedUntil))"
@@ -237,64 +327,12 @@ public final class SyncGramAccountsPanelController: ViewController {
             if let lastActivity = item.lastActivity {
                 statusParts.append("был \(Self.relativeFormatter.localizedString(for: lastActivity, relativeTo: Date()))")
             }
-            status.text = statusParts.joined(separator: " · ")
-            status.font = Font.regular(12.0)
-            status.textColor = theme.list.itemSecondaryTextColor
-            status.numberOfLines = 2
+            row.status.text = statusParts.joined(separator: " · ")
 
-            let actions = UIStackView()
-            actions.axis = .horizontal
-            actions.spacing = 8.0
-
-            if item.unreadTotal > 0 {
-                let open = UIButton(type: .system)
-                open.setTitle("Открыть непрочитанные", for: .normal)
-                open.titleLabel?.font = Font.semibold(13.0)
-                open.tag = Int(item.recordId.int64)
-                open.addTarget(self, action: #selector(self.openUnreadTapped(_:)), for: .touchUpInside)
-                actions.addArrangedSubview(open)
-            }
-
-            if let usernameValue = item.username {
-                let copy = UIButton(type: .system)
-                copy.setTitle("Скопировать username", for: .normal)
-                copy.titleLabel?.font = Font.regular(13.0)
-                copy.tag = Int(item.recordId.int64)
-                copy.accessibilityHint = usernameValue
-                copy.addTarget(self, action: #selector(self.copyUsernameTapped(_:)), for: .touchUpInside)
-                actions.addArrangedSubview(copy)
-            }
-
-            for view in [title, username, categories, lastMessage, status, actions] {
-                view.translatesAutoresizingMaskIntoConstraints = false
-                container.addSubview(view)
-            }
-
-            NSLayoutConstraint.activate([
-                title.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 14.0),
-                title.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -14.0),
-                title.topAnchor.constraint(equalTo: container.topAnchor, constant: 12.0),
-                username.leadingAnchor.constraint(equalTo: title.leadingAnchor),
-                username.trailingAnchor.constraint(equalTo: title.trailingAnchor),
-                username.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 2.0),
-                categories.leadingAnchor.constraint(equalTo: title.leadingAnchor),
-                categories.trailingAnchor.constraint(equalTo: title.trailingAnchor),
-                categories.topAnchor.constraint(equalTo: username.bottomAnchor, constant: 2.0),
-                lastMessage.leadingAnchor.constraint(equalTo: title.leadingAnchor),
-                lastMessage.trailingAnchor.constraint(equalTo: title.trailingAnchor),
-                lastMessage.topAnchor.constraint(equalTo: categories.bottomAnchor, constant: 6.0),
-                status.leadingAnchor.constraint(equalTo: title.leadingAnchor),
-                status.trailingAnchor.constraint(equalTo: title.trailingAnchor),
-                status.topAnchor.constraint(equalTo: lastMessage.bottomAnchor, constant: 4.0),
-                actions.leadingAnchor.constraint(equalTo: title.leadingAnchor),
-                actions.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -14.0),
-                actions.topAnchor.constraint(equalTo: status.bottomAnchor, constant: 8.0),
-                actions.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -12.0)
-            ])
-
-            self.stackView.insertArrangedSubview(container, at: insertionIndex)
-            insertionIndex += 1
+            row.openButton.isHidden = item.unreadTotal <= 0
+            row.copyButton.isHidden = item.username == nil
         }
+
         self.view.setNeedsLayout()
     }
 
