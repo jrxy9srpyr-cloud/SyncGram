@@ -154,7 +154,7 @@ public final class SyncGramChatListSizeController: ViewController {
         if self.previewRow.bounds.size != CGSize(width: rowWidth, height: rowHeight) {
             self.previewRow.bounds = CGRect(origin: CGPoint(), size: CGSize(width: rowWidth, height: rowHeight))
             self.previewRow.layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-            self.previewRow.position = CGPoint(x: self.previewContainer.bounds.midX, y: self.previewContainer.bounds.midY)
+            self.previewRow.center = CGPoint(x: self.previewContainer.bounds.midX, y: self.previewContainer.bounds.midY)
 
             self.previewAvatar.frame = CGRect(x: 12.0, y: 14.0, width: 56.0, height: 56.0)
             self.previewAvatar.layer.cornerRadius = 28.0
@@ -165,7 +165,7 @@ public final class SyncGramChatListSizeController: ViewController {
             self.previewTime.frame = CGRect(x: rowWidth - 60.0, y: 16.0, width: 48.0, height: 18.0)
             self.previewBadge.frame = CGRect(x: rowWidth - 34.0, y: 46.0, width: 20.0, height: 20.0)
         } else {
-            self.previewRow.position = CGPoint(x: self.previewContainer.bounds.midX, y: self.previewContainer.bounds.midY)
+            self.previewRow.center = CGPoint(x: self.previewContainer.bounds.midX, y: self.previewContainer.bounds.midY)
         }
 
         self.previewRow.transform = CGAffineTransform(scaleX: scale, y: scale)
