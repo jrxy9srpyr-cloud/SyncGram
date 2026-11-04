@@ -10859,7 +10859,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         var entities = generateTextEntities(text, enabledTypes: .all)
         var messageText = text
         var sendReplyTo = replyMessageSubject
-        if let replyMessage = self.presentationInterfaceState.interfaceState.replyMessage, replyMessage.isSyncGramDeleted {
+        if let replyMessage = self.presentationInterfaceState.replyMessage, replyMessage.isSyncGramDeleted {
             let authorName = replyMessage.author?.displayTitle(strings: self.presentationData.strings, displayOrder: self.presentationData.nameDisplayOrder) ?? "Удалённый пользователь"
             let quoteLine = authorName + "\nудалённое сообщение"
             messageText = quoteLine + "\n" + text
