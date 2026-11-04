@@ -94,6 +94,7 @@ submodules/SettingsUI/Sources/Notifications/NotificationsAndSoundsController.swi
 submodules/SettingsUI/Sources/NotificationsPeerCategoryController.swift
 submodules/SettingsUI/Sources/ReactionNotificationSettingsController.swift
 submodules/SettingsUI/Sources/Search/SettingsSearchableItems.swift
+submodules/SettingsUI/Sources/SyncGramSessionController.swift
 submodules/SettingsUI/Sources/Text Size/TextSizeSelectionController.swift
 submodules/SettingsUI/Sources/ThemePickerGridItem.swift
 submodules/SettingsUI/Sources/Themes/ThemePreviewControllerNode.swift
