@@ -16,6 +16,7 @@ import ChatInterfaceState
 import FastBlur
 import ConfettiEffect
 import WallpaperBackgroundNode
+import SyncGramUI
 import GridMessageSelectionNode
 import SparseItemGrid
 import ChatPresentationInterfaceState
@@ -216,6 +217,8 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
     let contentContainerNode: ChatNodeContainer
     let contentDimNode: ASDisplayNode
     let backgroundNode: WallpaperBackgroundNode
+    private let syncGramShaderNode = SyncGramShaderNode()
+    private var syncGramShaderObserver: NSObjectProtocol?
     var historyNode: ChatHistoryListNodeImpl
     var blurredHistoryNode: ASImageNode?
     let historyNodeContainer: HistoryNodeContainer
@@ -912,8 +915,15 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         self.addSubnode(self.wrappingNode)
         self.wrappingNode.contentNode.addSubnode(self.contentContainerNode)
         self.contentContainerNode.contentNode.addSubnode(self.backgroundNode)
+        self.contentContainerNode.contentNode.addSubnode(self.syncGramShaderNode)
         self.contentContainerNode.contentNode.addSubnode(self.historyNodeContainer)
         
+        self.backgroundNode.isHidden = SyncGramSettings.shaderEnabled
+        self.syncGramShaderNode.updateTheme(isDark: self.chatPresentationInterfaceState.theme.overallDarkAppearance, accent: self.chatPresentationInterfaceState.theme.list.itemAccentColor, base: self.chatPresentationInterfaceState.theme.chatList.backgroundColor)
+        self.syncGramShaderObserver = NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.shaderChanged, object: nil, queue: .main, using: { [weak self] _ in
+            self?.backgroundNode.isHidden = SyncGramSettings.shaderEnabled
+        })
+
         self.contentContainerNode.contentNode.addSubnode(self.messageTransitionNode)
         
         self.contentContainerNode.contentNode.addSubnode(self.floatingTopicsPanelContainer)
@@ -1074,6 +1084,9 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
     }
     
     deinit {
+        if let observer = self.syncGramShaderObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
         self.interactiveEmojisDisposable?.dispose()
         self.openStickersDisposable?.dispose()
         self.displayVideoUnmuteTipDisposable?.dispose()
@@ -2119,6 +2132,9 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         let wallpaperBounds = CGRect(x: 0.0, y: 0.0, width: layout.size.width - wrappingInsets.left - wrappingInsets.right, height: layout.size.height)
         
         transition.updateFrame(node: self.backgroundNode, frame: wallpaperBounds)
+        transition.updateFrame(node: self.syncGramShaderNode, frame: wallpaperBounds)
+        self.backgroundNode.isHidden = SyncGramSettings.shaderEnabled
+        self.syncGramShaderNode.updateTheme(isDark: self.chatPresentationInterfaceState.theme.overallDarkAppearance, accent: self.chatPresentationInterfaceState.theme.list.itemAccentColor, base: self.chatPresentationInterfaceState.theme.chatList.backgroundColor)
         
         var displayMode: WallpaperDisplayMode = .aspectFill
         if case .regular = layout.metrics.widthClass, let windowSize = layout.metrics.windowSize, windowSize.width > windowSize.height, layout.size.height == windowSize.height {

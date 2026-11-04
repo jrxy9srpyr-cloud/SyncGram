@@ -6,6 +6,7 @@ import Display
 import TelegramCore
 import Postbox
 import TelegramPresentationData
+import SyncGramUI
 import AccountContext
 
 /// Export and import of the portable SyncGram session backup.
@@ -59,6 +60,7 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
 
         let theme = self.presentationData.theme
         self.view.backgroundColor = theme.list.plainBackgroundColor
+        SyncGramShaderHost.install(on: self.view, backgroundColor: theme.list.plainBackgroundColor, isDark: theme.overallDarkAppearance, accent: theme.list.itemAccentColor)
 
         self.scrollView.alwaysBounceVertical = true
         self.view.addSubview(self.scrollView)

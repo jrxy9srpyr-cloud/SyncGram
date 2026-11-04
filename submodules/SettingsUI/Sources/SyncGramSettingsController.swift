@@ -8,6 +8,7 @@ import ItemListUI
 import AccountContext
 
 private enum SyncGramSettingsToggle: Int32 {
+    case shader
     case ghostMode
     case hideOnline
     case hideReads
@@ -24,6 +25,7 @@ private enum SyncGramSettingsToggle: Int32 {
 private final class SyncGramSettingsControllerArguments {
     let toggle: (SyncGramSettingsToggle, Bool) -> Void
     let openChatListSize: () -> Void
+    let openShaderStyle: () -> Void
     let openSecurityQuestion: () -> Void
     let openNavigation: () -> Void
     let openAccounts: () -> Void
@@ -31,9 +33,10 @@ private final class SyncGramSettingsControllerArguments {
     let openSession: () -> Void
     let readAllChats: () -> Void
 
-    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openSecurityQuestion: @escaping () -> Void, openNavigation: @escaping () -> Void, openAccounts: @escaping () -> Void, openCache: @escaping () -> Void, openSession: @escaping () -> Void, readAllChats: @escaping () -> Void) {
+    init(toggle: @escaping (SyncGramSettingsToggle, Bool) -> Void, openChatListSize: @escaping () -> Void, openShaderStyle: @escaping () -> Void, openSecurityQuestion: @escaping () -> Void, openNavigation: @escaping () -> Void, openAccounts: @escaping () -> Void, openCache: @escaping () -> Void, openSession: @escaping () -> Void, readAllChats: @escaping () -> Void) {
         self.toggle = toggle
         self.openChatListSize = openChatListSize
+        self.openShaderStyle = openShaderStyle
         self.openSecurityQuestion = openSecurityQuestion
         self.openNavigation = openNavigation
         self.openAccounts = openAccounts
@@ -44,80 +47,126 @@ private final class SyncGramSettingsControllerArguments {
 }
 
 private enum SyncGramSettingsSection: Int32 {
-    case main
+    case appearance
+    case privacy
+    case notifications
+    case data
+    case actions
+    case about
 }
 
 private enum SyncGramSettingsEntry: ItemListNodeEntry {
-    case header
+    case appearanceHeader
+    case shader(Bool)
+    case shaderStyle(String)
+    case chatListSize(String)
+
+    case privacyHeader
     case ghostMode(Bool)
     case hideOnline(Bool)
     case hideReads(Bool)
     case hideTyping(Bool)
     case hideStories(Bool)
     case copyProtection(Bool)
-    case screenshots(Bool)
-    case blockedChats(Bool)
     case hideAds(Bool)
+    case screenshots(Bool)
     case flipToHide(Bool)
+    case blockedChats(Bool)
+
+    case notificationsHeader
     case backgroundRefresh(Bool)
-    case signingInfo(String)
-    case chatListSize(String)
-    case securityQuestion(String)
-    case navigation
+
+    case dataHeader
     case accounts
     case cache
     case session
+    case securityQuestion(String)
+    case navigation
+    case signingInfo(String)
+
+    case actionsHeader
     case readAll
+
     case footer
 
     var section: ItemListSectionId {
-        return SyncGramSettingsSection.main.rawValue
+        switch self {
+        case .appearanceHeader, .shader, .shaderStyle, .chatListSize:
+            return SyncGramSettingsSection.appearance.rawValue
+        case .privacyHeader, .ghostMode, .hideOnline, .hideReads, .hideTyping, .hideStories, .copyProtection, .hideAds, .screenshots, .flipToHide, .blockedChats:
+            return SyncGramSettingsSection.privacy.rawValue
+        case .notificationsHeader, .backgroundRefresh:
+            return SyncGramSettingsSection.notifications.rawValue
+        case .dataHeader, .accounts, .cache, .session, .securityQuestion, .navigation, .signingInfo:
+            return SyncGramSettingsSection.data.rawValue
+        case .actionsHeader, .readAll:
+            return SyncGramSettingsSection.actions.rawValue
+        case .footer:
+            return SyncGramSettingsSection.about.rawValue
+        }
     }
 
     var stableId: Int32 {
         switch self {
-        case .header:
+        case .appearanceHeader:
             return 0
-        case .ghostMode:
+        case .shader:
             return 1
-        case .hideOnline:
+        case .shaderStyle:
             return 2
-        case .hideReads:
-            return 3
-        case .hideTyping:
-            return 4
-        case .hideStories:
-            return 5
-        case .copyProtection:
-            return 6
-        case .screenshots:
-            return 7
-        case .blockedChats:
-            return 8
-        case .hideAds:
-            return 9
-        case .flipToHide:
-            return 10
-        case .backgroundRefresh:
-            return 11
-        case .signingInfo:
-            return 12
         case .chatListSize:
+            return 3
+
+        case .privacyHeader:
+            return 4
+        case .ghostMode:
+            return 5
+        case .hideOnline:
+            return 6
+        case .hideReads:
+            return 7
+        case .hideTyping:
+            return 8
+        case .hideStories:
+            return 9
+        case .copyProtection:
+            return 10
+        case .hideAds:
+            return 11
+        case .screenshots:
+            return 12
+        case .flipToHide:
             return 13
-        case .securityQuestion:
+        case .blockedChats:
             return 14
-        case .navigation:
+
+        case .notificationsHeader:
             return 15
-        case .accounts:
+        case .backgroundRefresh:
             return 16
-        case .cache:
+
+        case .dataHeader:
             return 17
-        case .session:
+        case .accounts:
             return 18
-        case .readAll:
+        case .cache:
             return 19
-        case .footer:
+        case .session:
             return 20
+        case .securityQuestion:
+            return 21
+        case .navigation:
+            return 22
+        case .signingInfo:
+            return 23
+
+        case .actionsHeader:
+            return 24
+        case .readAll:
+            return 25
+
+        case .footer:
+            return 26
         }
     }
 
@@ -128,14 +177,29 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
         let arguments = arguments as! SyncGramSettingsControllerArguments
         switch self {
-        case .header:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: "SyncGram", sectionId: self.section)
+        case .appearanceHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "Внешний вид", sectionId: self.section)
+        case let .shader(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Живой фон", text: "Анимированный узор за списком чатов, в чатах и в настройках. Работает локально и почти не расходует батарею.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.shader, value)
+            })
+        case let .shaderStyle(value):
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Стиль фона", enabled: SyncGramSettings.shaderEnabled, label: value, sectionId: self.section, style: .blocks, action: {
+                arguments.openShaderStyle()
+            })
+        case let .chatListSize(value):
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Размер списка чатов", label: value, sectionId: self.section, style: .blocks, action: {
+                arguments.openChatListSize()
+            })
+
+        case .privacyHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "Приватность", sectionId: self.section)
         case let .ghostMode(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Удалённые сообщения", text: "Сохраняет удалённые сообщения локально и помечает их.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Хранить удалённые сообщения", text: "Сохраняет удалённые сообщения локально и помечает их.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.ghostMode, value)
             })
         case let .hideOnline(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Режим призрака (не показывать онлайн)", text: "Не отправляет статус «онлайн».", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Не показывать «онлайн»", text: "Не отправляет собеседникам статус «онлайн».", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideOnline, value)
             })
         case let .hideReads(value):
@@ -154,40 +218,32 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Обход защиты от копирования", text: "Разрешает пересылку и сохранение защищённого контента.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.copyProtection, value)
             })
-        case let .screenshots(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Скриншоты в секретных чатах", text: "Не отправляет собеседнику уведомление о скриншоте.", value: value, sectionId: self.section, style: .blocks, updated: { value in
-                arguments.toggle(.screenshots, value)
-            })
-        case let .blockedChats(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Сохранять чаты после блокировки", text: "Оставляет чат доступным после блокировки или бана.", value: value, sectionId: self.section, style: .blocks, updated: { value in
-                arguments.toggle(.blockedChats, value)
-            })
         case let .hideAds(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Отключение рекламы", text: "Скрывает рекламные сообщения Telegram.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.hideAds, value)
+            })
+        case let .screenshots(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Скриншоты в секретных чатах", text: "Не блокирует экран и не отправляет уведомление о скриншоте.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.screenshots, value)
             })
         case let .flipToHide(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Скрывать экран при перевороте", text: "Прячет имена, аватары и сообщения, когда телефон лежит экраном вниз.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.flipToHide, value)
             })
+        case let .blockedChats(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Сохранять чаты после блокировки", text: "Оставляет чат доступным после блокировки или бана.", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.toggle(.blockedChats, value)
+            })
+
+        case .notificationsHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "Уведомления", sectionId: self.section)
         case let .backgroundRefresh(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Уведомления в фоне", text: "Иногда проверяет новые сообщения, когда приложение свёрнуто, и показывает локальное уведомление. iOS решает когда; работает без сервера.", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(.backgroundRefresh, value)
             })
-        case let .signingInfo(value):
-            return ItemListDisclosureItem(presentationData: presentationData, title: "Срок подписи", label: value, sectionId: self.section, style: .blocks, action: nil)
-        case let .chatListSize(value):
-            return ItemListDisclosureItem(presentationData: presentationData, title: "Размер списка чатов", label: value, sectionId: self.section, style: .blocks, action: {
-                arguments.openChatListSize()
-            })
-        case let .securityQuestion(value):
-            return ItemListDisclosureItem(presentationData: presentationData, title: "Контрольный вопрос", label: value, sectionId: self.section, style: .blocks, action: {
-                arguments.openSecurityQuestion()
-            })
-        case .navigation:
-            return ItemListDisclosureItem(presentationData: presentationData, title: "Навигация", label: "Вкладки", sectionId: self.section, style: .blocks, action: {
-                arguments.openNavigation()
-            })
+
+        case .dataHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "Данные и аккаунт", sectionId: self.section)
         case .accounts:
             return ItemListDisclosureItem(presentationData: presentationData, title: "Аккаунты", label: "Панель", sectionId: self.section, style: .blocks, action: {
                 arguments.openAccounts()
@@ -200,12 +256,26 @@ private enum SyncGramSettingsEntry: ItemListNodeEntry {
             return ItemListDisclosureItem(presentationData: presentationData, title: "Сессия аккаунта", label: "Экспорт и импорт", sectionId: self.section, style: .blocks, action: {
                 arguments.openSession()
             })
+        case let .securityQuestion(value):
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Контрольный вопрос", label: value, sectionId: self.section, style: .blocks, action: {
+                arguments.openSecurityQuestion()
+            })
+        case .navigation:
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Навигация", label: "Вкладки", sectionId: self.section, style: .blocks, action: {
+                arguments.openNavigation()
+            })
+        case let .signingInfo(value):
+            return ItemListDisclosureItem(presentationData: presentationData, title: "Срок подписи", label: value, sectionId: self.section, style: .blocks, action: nil)
+
+        case .actionsHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "Действия", sectionId: self.section)
         case .readAll:
             return ItemListActionItem(presentationData: presentationData, title: "Прочитать все чаты", kind: .generic, alignment: .center, sectionId: self.section, style: .blocks, action: {
                 arguments.readAllChats()
             })
+
         case .footer:
-            return ItemListTextItem(presentationData: presentationData, text: .markdown("Эти настройки действуют только на этом устройстве. Удалённые сообщения остаются в локальной базе, пересылка и сохранение игнорируют клиентскую защиту, а секретные чаты не отправляют уведомления о скриншотах. Сервер по-прежнему может отклонить действие, если оно запрещено на его стороне. SyncGram никуда не отправляет твои данные."), sectionId: self.section)
+            return ItemListTextItem(presentationData: presentationData, text: .markdown("Эти настройки действуют только на этом устройстве. Удалённые сообщения остаются в локальной базе, пересылка и сохранение игнорируют клиентскую защиту, а секретные чаты не отправляют уведомления о скриншотах. Живой фон рисуется на устройстве и никуда не отправляется. Сервер по-прежнему может отклонить действие, если оно запрещено на его стороне."), sectionId: self.section)
         }
     }
 }
@@ -222,26 +292,37 @@ private func syncGramSettingsEntries() -> [SyncGramSettingsEntry] {
 
 private func syncGramSettingsEntries(signingInfoText: String) -> [SyncGramSettingsEntry] {
     return [
-        .header,
+        .appearanceHeader,
+        .shader(SyncGramSettings.shaderEnabled),
+        .shaderStyle(SyncGramSettings.shaderStyle.title),
+        .chatListSize("\(Int(round(SyncGramSettings.chatListScale * 100.0)))%"),
+
+        .privacyHeader,
         .ghostMode(SyncGramSettings.ghostModeEnabled),
         .hideOnline(SyncGramSettings.hideOnlineStatusEnabled),
         .hideReads(SyncGramSettings.hideReadReceiptsEnabled),
         .hideTyping(SyncGramSettings.hideTypingEnabled),
         .hideStories(SyncGramSettings.hideStoryViewsEnabled),
         .copyProtection(SyncGramSettings.bypassCopyProtectionEnabled),
-        .screenshots(SyncGramSettings.allowSecretScreenshots),
-        .blockedChats(SyncGramSettings.keepBlockedChatsEnabled),
         .hideAds(SyncGramSettings.hideAdsEnabled),
+        .screenshots(SyncGramSettings.allowSecretScreenshots),
         .flipToHide(SyncGramSettings.flipToHideEnabled),
+        .blockedChats(SyncGramSettings.keepBlockedChatsEnabled),
+
+        .notificationsHeader,
         .backgroundRefresh(SyncGramSettings.backgroundRefreshEnabled),
-        .signingInfo(signingInfoText),
-        .chatListSize("\(Int(round(SyncGramSettings.chatListScale * 100.0)))%"),
-        .securityQuestion(SyncGramChatLock.shared.hasSecurityQuestion ? "Задан" : "Не задан"),
-        .navigation,
+
+        .dataHeader,
         .accounts,
         .cache,
         .session,
+        .securityQuestion(SyncGramChatLock.shared.hasSecurityQuestion ? "Задан" : "Не задан"),
+        .navigation,
+        .signingInfo(signingInfoText),
+
+        .actionsHeader,
         .readAll,
+
         .footer
     ]
 }
@@ -259,6 +340,7 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     })
 
     var openChatListSizeImpl: (() -> Void)?
+    var openShaderStyleImpl: (() -> Void)?
     var openSecurityQuestionImpl: (() -> Void)?
     var openNavigationImpl: (() -> Void)?
     var openAccountsImpl: (() -> Void)?
@@ -267,6 +349,9 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
 
     let arguments = SyncGramSettingsControllerArguments(toggle: { toggle, value in
         switch toggle {
+        case .shader:
+            SyncGramSettings.shaderEnabled = value
+            NotificationCenter.default.post(name: SyncGramNotificationNames.shaderChanged, object: nil)
         case .ghostMode:
             SyncGramSettings.ghostModeEnabled = value
         case .hideOnline:
@@ -296,6 +381,8 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
         revision.set(0)
     }, openChatListSize: {
         openChatListSizeImpl?()
+    }, openShaderStyle: {
+        openShaderStyleImpl?()
     }, openSecurityQuestion: {
         openSecurityQuestionImpl?()
     }, openNavigation: {
@@ -335,6 +422,9 @@ public func syncGramSettingsController(context: AccountContext) -> ViewControlle
     controller.navigationPresentation = .modal
     openChatListSizeImpl = { [weak controller] in
         controller?.push(SyncGramChatListSizeController(context: context))
+    }
+    openShaderStyleImpl = { [weak controller] in
+        controller?.push(syncGramShaderStyleController(context: context))
     }
     openSecurityQuestionImpl = { [weak controller] in
         controller?.push(SyncGramSecurityQuestionController(context: context))

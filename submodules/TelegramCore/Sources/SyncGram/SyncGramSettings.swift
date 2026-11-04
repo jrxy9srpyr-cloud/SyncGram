@@ -16,6 +16,8 @@ public enum SyncGramSettings {
         static let flipToHide = "syncgram.flipToHide"
         static let backgroundRefresh = "syncgram.backgroundRefresh"
         static let chatListScale = "syncgram.chatListScale"
+        static let shaderEnabled = "syncgram.shaderEnabled"
+        static let shaderStyle = "syncgram.shaderStyle"
     }
 
     private static var defaults: UserDefaults {
@@ -82,6 +84,23 @@ public enum SyncGramSettings {
         set { defaults.set(newValue, forKey: Key.backgroundRefresh) }
     }
 
+    /// An ambient animated background drawn behind the chat list, chats and list screens.
+    /// Off by default: it costs a little battery and is a matter of taste.
+    public static var shaderEnabled: Bool {
+        get { return defaults.bool(forKey: Key.shaderEnabled) }
+        set { defaults.set(newValue, forKey: Key.shaderEnabled) }
+    }
+
+    public static var shaderStyle: SyncGramShaderStyle {
+        get {
+            if let raw = defaults.object(forKey: Key.shaderStyle) as? Int, let style = SyncGramShaderStyle(rawValue: Int32(raw)) {
+                return style
+            }
+            return .aurora
+        }
+        set { defaults.set(Int(newValue.rawValue), forKey: Key.shaderStyle) }
+    }
+
     /// Settings included in the portable session backup. Kept as strings so the file format stays
     /// forward compatible when new switches are added.
     public static func sessionSnapshot() -> [String: String] {
@@ -97,6 +116,8 @@ public enum SyncGramSettings {
             "hideAds": self.hideAdsEnabled ? "1" : "0",
             "flipToHide": self.flipToHideEnabled ? "1" : "0",
             "backgroundRefresh": self.backgroundRefreshEnabled ? "1" : "0",
+            "shader": self.shaderEnabled ? "1" : "0",
+            "shaderStyle": String(self.shaderStyle.rawValue),
             "chatListScale": String(self.chatListScale)
         ]
     }
@@ -121,6 +142,10 @@ public enum SyncGramSettings {
         if let value = flag("hideAds") { self.hideAdsEnabled = value }
         if let value = flag("flipToHide") { self.flipToHideEnabled = value }
         if let value = flag("backgroundRefresh") { self.backgroundRefreshEnabled = value }
+        if let value = flag("shader") { self.shaderEnabled = value }
+        if let raw = values["shaderStyle"], let value = Int32(raw), let style = SyncGramShaderStyle(rawValue: value) {
+            self.shaderStyle = style
+        }
         if let raw = values["chatListScale"], let scale = Double(raw) {
             self.chatListScale = scale
         }
@@ -150,6 +175,7 @@ public enum SyncGramNotificationNames {
     public static let flipToHideChanged = Notification.Name("SyncGramFlipToHideChanged")
     public static let settingsChanged = Notification.Name("SyncGramSettingsChanged")
     public static let backgroundRefreshChanged = Notification.Name("SyncGramBackgroundRefreshChanged")
+    public static let shaderChanged = Notification.Name("SyncGramShaderChanged")
 }
 
 /// Cached chat list scale, so the row layout does not read UserDefaults on every access.

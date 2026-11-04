@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import AsyncDisplayKit
 import Display
+import SyncGramUI
 import TelegramCore
 import SwiftSignalKit
 import TelegramPresentationData
@@ -526,7 +527,7 @@ public final class ChatListContainerNode: ASDisplayNode, ASGestureRecognizerDele
         
         super.init()
         
-        self.backgroundColor = presentationData.theme.chatList.backgroundColor
+        self.backgroundColor = SyncGramSettings.shaderEnabled ? .clear : presentationData.theme.chatList.backgroundColor
         
         let itemNode = ChatListContainerItemNode(context: self.context, controller: self.controller, location: self.location, filter: nil, chatListMode: chatListMode, previewing: self.previewing, isInlineMode: self.isInlineMode, controlsHistoryPreload: self.controlsHistoryPreload, presentationData: presentationData, animationCache: self.animationCache, animationRenderer: self.animationRenderer, becameEmpty: { [weak self] filter in
             self?.filterBecameEmpty(filter)
@@ -816,9 +817,9 @@ public final class ChatListContainerNode: ASDisplayNode, ASGestureRecognizerDele
         
         if let validLayout = self.validLayout {
             if let _ = validLayout.inlineNavigationLocation {
-                self.backgroundColor = self.presentationData.theme.chatList.backgroundColor.mixedWith(self.presentationData.theme.chatList.pinnedItemBackgroundColor, alpha: validLayout.inlineNavigationTransitionFraction)
+                self.backgroundColor = SyncGramSettings.shaderEnabled ? .clear : self.presentationData.theme.chatList.backgroundColor.mixedWith(self.presentationData.theme.chatList.pinnedItemBackgroundColor, alpha: validLayout.inlineNavigationTransitionFraction)
             } else {
-                self.backgroundColor = self.presentationData.theme.chatList.backgroundColor
+                self.backgroundColor = SyncGramSettings.shaderEnabled ? .clear : self.presentationData.theme.chatList.backgroundColor
             }
         }
         
@@ -1058,7 +1059,9 @@ public final class ChatListContainerNode: ASDisplayNode, ASGestureRecognizerDele
         transition.updateAlpha(node: self, alpha: isReorderingFilters ? 0.5 : 1.0)
         self.isUserInteractionEnabled = !isReorderingFilters
         
-        if let _ = inlineNavigationLocation {
+        if SyncGramSettings.shaderEnabled {
+            transition.updateBackgroundColor(node: self, color: .clear)
+        } else if let _ = inlineNavigationLocation {
             transition.updateBackgroundColor(node: self, color: self.presentationData.theme.chatList.backgroundColor.mixedWith(self.presentationData.theme.chatList.pinnedItemBackgroundColor, alpha: inlineNavigationTransitionFraction))
         } else {
             transition.updateBackgroundColor(node: self, color: self.presentationData.theme.chatList.backgroundColor)
@@ -1219,6 +1222,9 @@ final class ChatListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
     
     let debugListView = ListViewImpl()
     
+    private let syncGramShaderNode = SyncGramShaderNode()
+    private var syncGramShaderObserver: NSObjectProtocol?
+
     init(context: AccountContext, location: ChatListControllerLocation, previewing: Bool, controlsHistoryPreload: Bool, presentationData: PresentationData, animationCache: AnimationCache, animationRenderer: MultiAnimationRenderer, controller: ChatListControllerImpl) {
         self.context = context
         self.location = location
@@ -1248,10 +1254,21 @@ final class ChatListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
             return UITracingLayerView()
         })
         
-        self.backgroundColor = presentationData.theme.chatList.backgroundColor
+        self.backgroundColor = SyncGramSettings.shaderEnabled ? .clear : presentationData.theme.chatList.backgroundColor
         
+        self.addSubnode(self.syncGramShaderNode)
         self.addSubnode(self.mainContainerNode)
         
+        self.syncGramShaderObserver = NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.shaderChanged, object: nil, queue: .main, using: { [weak self] _ in
+            guard let self else {
+                return
+            }
+            self.backgroundColor = SyncGramSettings.shaderEnabled ? .clear : self.presentationData.theme.chatList.backgroundColor
+            self.mainContainerNode.updatePresentationData(self.presentationData)
+            self.inlineStackContainerNode?.updatePresentationData(self.presentationData)
+        })
+        self.syncGramShaderNode.updateTheme(isDark: presentationData.theme.overallDarkAppearance, accent: presentationData.theme.list.itemAccentColor, base: presentationData.theme.chatList.backgroundColor)
+
         self.mainContainerNode.contentOffsetChanged = { [weak self] offset, listView in
             self?.contentOffsetChanged(offset: offset, listView: listView, isPrimary: true)
         }
@@ -1434,7 +1451,8 @@ final class ChatListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
     func updatePresentationData(_ presentationData: PresentationData) {
         self.presentationData = presentationData
         
-        self.backgroundColor = self.presentationData.theme.chatList.backgroundColor
+        self.backgroundColor = SyncGramSettings.shaderEnabled ? .clear : self.presentationData.theme.chatList.backgroundColor
+        self.syncGramShaderNode.updateTheme(isDark: presentationData.theme.overallDarkAppearance, accent: presentationData.theme.list.itemAccentColor, base: presentationData.theme.chatList.backgroundColor)
         
         self.mainContainerNode.updatePresentationData(presentationData)
         self.inlineStackContainerNode?.updatePresentationData(presentationData)
@@ -2008,6 +2026,7 @@ final class ChatListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
         childrenLayout.intrinsicInsets = UIEdgeInsets(top: visualNavigationHeight, left: childrenLayout.intrinsicInsets.left, bottom: childrenLayout.intrinsicInsets.bottom, right: childrenLayout.intrinsicInsets.right)
         self.controller?.presentationContext.containerLayoutUpdated(childrenLayout, transition: transition)
         
+        transition.updateFrame(node: self.syncGramShaderNode, frame: CGRect(origin: CGPoint(), size: layout.size))
         transition.updateFrame(node: self.mainContainerNode, frame: CGRect(origin: CGPoint(), size: layout.size))
         var mainNavigationBarHeight = navigationBarHeight
         var cleanMainNavigationBarHeight = cleanNavigationBarHeight
@@ -2512,6 +2531,12 @@ final class ChatListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
         if let contentOffset = self.mainContainerNode.contentOffset, case let .known(offset) = contentOffset, offset < 0.0 {
             self.mainContainerNode.scrollToTop(animated: true, adjustForTempInset: false)
             self.mainContainerNode.tempTopInset = 0.0
+        }
+    }
+
+    deinit {
+        if let observer = self.syncGramShaderObserver {
+            NotificationCenter.default.removeObserver(observer)
         }
     }
 }

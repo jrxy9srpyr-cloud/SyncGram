@@ -5,6 +5,7 @@ import SwiftSignalKit
 import TelegramCore
 import Postbox
 import TelegramPresentationData
+import SyncGramUI
 import AccountContext
 
 private struct SyncGramStreamChatItem {
@@ -51,6 +52,7 @@ public final class SyncGramStreamChatsController: ViewController {
         super.viewDidLoad()
         let theme = self.presentationData.theme
         self.view.backgroundColor = theme.list.plainBackgroundColor
+        SyncGramShaderHost.install(on: self.view, backgroundColor: theme.list.plainBackgroundColor, isDark: theme.overallDarkAppearance, accent: theme.list.itemAccentColor)
 
         self.titleLabel.text = "Чаты для Потока"
         self.titleLabel.font = Font.semibold(20.0)

@@ -30,6 +30,7 @@ swift_library(
         "//submodules/ManagedAnimationNode:ManagedAnimationNode",
         "//submodules/AvatarNode",
         "//submodules/TelegramCore",
+        "//submodules/SyncGramUI:SyncGramUI",
         "//submodules/ComponentFlow",
         "//submodules/TelegramUI/Components/TabSelectorComponent",
         "//submodules/Components/ComponentDisplayAdapters",

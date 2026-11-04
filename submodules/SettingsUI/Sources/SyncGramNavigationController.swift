@@ -3,6 +3,7 @@ import UIKit
 import Display
 import TelegramCore
 import TelegramPresentationData
+import SyncGramUI
 import AccountContext
 
 public final class SyncGramNavigationController: ViewController {
@@ -34,6 +35,7 @@ public final class SyncGramNavigationController: ViewController {
 
         let theme = self.presentationData.theme
         self.view.backgroundColor = theme.list.plainBackgroundColor
+        SyncGramShaderHost.install(on: self.view, backgroundColor: theme.list.plainBackgroundColor, isDark: theme.overallDarkAppearance, accent: theme.list.itemAccentColor)
 
         self.titleLabel.text = "Навигация"
         self.titleLabel.font = Font.semibold(20.0)

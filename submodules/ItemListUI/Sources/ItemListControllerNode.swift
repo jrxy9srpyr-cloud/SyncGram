@@ -4,6 +4,7 @@ import AsyncDisplayKit
 import Display
 import SwiftSignalKit
 import TelegramCore
+import SyncGramUI
 import TelegramPresentationData
 import MergeLists
 import ComponentFlow
@@ -281,6 +282,8 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
     
     private var enqueuedTransitions: [ItemListNodeTransition] = []
     private var validLayout: (ContainerViewLayout, CGFloat, UIEdgeInsets)?
+    private let syncGramShaderNode = SyncGramShaderNode()
+    private var syncGramShaderObserver: NSObjectProtocol?
     
     private var theme: PresentationTheme?
     private var listStyle: ItemListStyle?
@@ -334,9 +337,19 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
         self.backgroundColor = nil
         self.isOpaque = false
         
+        self.addSubnode(self.syncGramShaderNode)
         self.addSubnode(self.listNodeContainer)
         self.listNodeContainer.addSubnode(self.listNode)
         
+        self.syncGramShaderObserver = NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.shaderChanged, object: nil, queue: .main, using: { [weak self] _ in
+            guard let self else {
+                return
+            }
+            if let theme = self.theme, let listStyle = self.listStyle {
+                self.applySyncGramBackground(theme: theme, listStyle: listStyle)
+            }
+        })
+
         self.listNode.displayedItemRangeChanged = { [weak self] displayedRange, opaqueTransactionState in
             if let strongSelf = self, let visibleEntriesUpdated = strongSelf.visibleEntriesUpdated, let mergedEntries = (opaqueTransactionState as? ItemListNodeOpaqueState)?.mergedEntries {
                 if let visible = displayedRange.visibleRange {
@@ -474,6 +487,9 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
     
     deinit {
         self.transitionDisposable.dispose()
+        if let observer = self.syncGramShaderObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
     override open func didLoad() {
@@ -704,6 +720,8 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
     }
     
     open func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition, additionalInsets: UIEdgeInsets) {
+        transition.updateFrame(node: self.syncGramShaderNode, frame: CGRect(origin: CGPoint(), size: layout.size))
+
         var insets = layout.insets(options: [.input])
         insets.top += navigationBarHeight
         insets.bottom = max(insets.bottom, additionalInsets.bottom)
@@ -940,6 +958,22 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
         }
     }
     
+    private func applySyncGramBackground(theme: PresentationTheme, listStyle: ItemListStyle) {
+        let color: UIColor
+        switch listStyle {
+        case .plain:
+            color = theme.list.plainBackgroundColor
+        case .blocks:
+            color = theme.list.blocksBackgroundColor
+        }
+        let resolved: UIColor = SyncGramSettings.shaderEnabled ? .clear : color
+        self.backgroundColor = resolved
+        self.listNode.backgroundColor = resolved
+        self.leftOverlayNode.backgroundColor = resolved
+        self.rightOverlayNode.backgroundColor = resolved
+        self.syncGramShaderNode.updateTheme(isDark: theme.overallDarkAppearance, accent: theme.list.itemAccentColor, base: color)
+    }
+
     private func enqueueTransition(_ transition: ItemListNodeTransition) {
         self.enqueuedTransitions.append(transition)
         if self.validLayout != nil {
@@ -955,18 +989,7 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
                 self.theme = transition.theme
                 
                 if let listStyle = self.listStyle {
-                    switch listStyle {
-                        case .plain:
-                            self.backgroundColor = transition.theme.list.plainBackgroundColor
-                            self.listNode.backgroundColor = transition.theme.list.plainBackgroundColor
-                            self.leftOverlayNode.backgroundColor = transition.theme.list.plainBackgroundColor
-                            self.rightOverlayNode.backgroundColor = transition.theme.list.plainBackgroundColor
-                        case .blocks:
-                            self.backgroundColor = transition.theme.list.blocksBackgroundColor
-                            self.listNode.backgroundColor = transition.theme.list.blocksBackgroundColor
-                            self.leftOverlayNode.backgroundColor = transition.theme.list.blocksBackgroundColor
-                            self.rightOverlayNode.backgroundColor = transition.theme.list.blocksBackgroundColor
-                    }
+                    self.applySyncGramBackground(theme: transition.theme, listStyle: listStyle)
                 }
                 
                 self.listNode.forEachItemHeaderNode({ itemHeaderNode in
@@ -980,21 +1003,12 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
                 self.listStyle = updateStyle
                 
                 if let _ = self.theme {
+                    self.applySyncGramBackground(theme: transition.theme, listStyle: updateStyle)
                     switch updateStyle {
                         case .plain:
-                            self.backgroundColor = transition.theme.list.plainBackgroundColor
-                            self.listNode.backgroundColor = transition.theme.list.plainBackgroundColor
-                            self.leftOverlayNode.backgroundColor = transition.theme.list.plainBackgroundColor
-                            self.rightOverlayNode.backgroundColor = transition.theme.list.plainBackgroundColor
-                        
                             self.leftOverlayNode.isHidden = true
                             self.rightOverlayNode.isHidden = true
                         case .blocks:
-                            self.backgroundColor = transition.theme.list.blocksBackgroundColor
-                            self.listNode.backgroundColor = transition.theme.list.blocksBackgroundColor
-                            self.leftOverlayNode.backgroundColor = transition.theme.list.blocksBackgroundColor
-                            self.rightOverlayNode.backgroundColor = transition.theme.list.blocksBackgroundColor
-                        
                             self.leftOverlayNode.isHidden = false
                             self.rightOverlayNode.isHidden = false
                     }

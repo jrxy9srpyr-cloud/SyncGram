@@ -4,6 +4,7 @@ import Display
 import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
+import SyncGramUI
 import AccountContext
 
 public final class SyncGramCacheController: ViewController {
@@ -45,6 +46,7 @@ public final class SyncGramCacheController: ViewController {
         super.viewDidLoad()
         let theme = self.presentationData.theme
         self.view.backgroundColor = theme.list.plainBackgroundColor
+        SyncGramShaderHost.install(on: self.view, backgroundColor: theme.list.plainBackgroundColor, isDark: theme.overallDarkAppearance, accent: theme.list.itemAccentColor)
 
         self.titleLabel.text = "Умное управление кэшем"
         self.titleLabel.font = Font.semibold(20.0)

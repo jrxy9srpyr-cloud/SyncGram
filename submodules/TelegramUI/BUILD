@@ -98,6 +98,7 @@ swift_library(
         "//submodules/ProgressNavigationButtonNode:ProgressNavigationButtonNode",
         "//submodules/ItemListUI:ItemListUI",
         "//submodules/TelegramBaseController:TelegramBaseController",
+        "//submodules/SyncGramUI:SyncGramUI",
         "//submodules/DeviceLocationManager:DeviceLocationManager",
         "//submodules/AvatarNode:AvatarNode",
         "//submodules/AvatarVideoNode:AvatarVideoNode",

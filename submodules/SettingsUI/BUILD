@@ -28,6 +28,7 @@ swift_library(
         "//submodules/CallListUI:CallListUI",
         "//submodules/ChatListSearchItemHeader:ChatListSearchItemHeader",
         "//submodules/ChatListUI:ChatListUI",
+        "//submodules/SyncGramUI:SyncGramUI",
         "//submodules/ContactsPeerItem:ContactsPeerItem",
         "//submodules/CountrySelectionUI:CountrySelectionUI",
         "//submodules/DeviceAccess:DeviceAccess",
