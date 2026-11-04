@@ -10860,7 +10860,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         var messageText = text
         var sendReplyTo = replyMessageSubject
         if let replyMessage = self.presentationInterfaceState.replyMessage, replyMessage.isSyncGramDeleted {
-            let authorName = replyMessage.author?.displayTitle(strings: self.presentationData.strings, displayOrder: self.presentationData.nameDisplayOrder) ?? "Удалённый пользователь"
+            let authorName = replyMessage.author.flatMap(EnginePeer.init)?.displayTitle(strings: self.presentationData.strings, displayOrder: self.presentationData.nameDisplayOrder) ?? "Удалённый пользователь"
             let quoteLine = authorName + "\nудалённое сообщение"
             messageText = quoteLine + "\n" + text
             let quoteLength = (quoteLine as NSString).length
