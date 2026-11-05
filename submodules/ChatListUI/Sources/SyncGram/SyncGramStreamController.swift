@@ -398,7 +398,7 @@ public final class SyncGramStreamController: ViewController {
                     var result: [SyncGramStreamItem] = []
                     for entry in view.0.entries {
                         guard case let .MessageEntry(entryData) = entry, let message = entryData.messages.first else { continue }
-                        let chatPeer = entryData.renderedPeer.peer.flatMap(EnginePeer.init)
+                        let chatPeer = entryData.renderedPeer.peer
                         let chatTitle = chatPeer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? "Чат"
                         let authorPeer = message.author ?? chatPeer
                         let authorName = authorPeer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? chatTitle

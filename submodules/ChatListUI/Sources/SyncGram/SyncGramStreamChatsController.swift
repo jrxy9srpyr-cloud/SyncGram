@@ -187,7 +187,7 @@ public final class SyncGramStreamChatsController: ViewController {
                     var result: [SyncGramStreamChatItem] = []
                     for entry in view.0.entries {
                         guard case let .MessageEntry(data) = entry else { continue }
-                        let avatarPeer = data.renderedPeer.peer.flatMap(EnginePeer.init)
+                        let avatarPeer = data.renderedPeer.peer
                         let chatTitle = avatarPeer?.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder) ?? "Чат"
                         result.append(SyncGramStreamChatItem(
                             accountId: accountId,
