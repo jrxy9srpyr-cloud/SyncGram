@@ -30,7 +30,7 @@ private enum SyncGramStreamEntry {
     case message(SyncGramStreamItem)
 }
 
-private func syncGramStreamMediaText(_ message: EngineMessage) -> String {
+private func syncGramStreamMediaText(_ message: Message) -> String {
     guard let media = message.media.first else {
         return ""
     }
@@ -400,7 +400,7 @@ public final class SyncGramStreamController: ViewController {
                         guard case let .MessageEntry(entryData) = entry, let message = entryData.messages.first else { continue }
                         let chatPeer = entryData.renderedPeer.peer.flatMap { EnginePeer($0) }
                         let chatTitle = chatPeer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? "Чат"
-                        let authorPeer = message.author ?? chatPeer
+                        let authorPeer = message.author.flatMap { EnginePeer($0) } ?? chatPeer
                         let authorName = authorPeer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? chatTitle
                         let mediaText = syncGramStreamMediaText(message)
                         let text: String
