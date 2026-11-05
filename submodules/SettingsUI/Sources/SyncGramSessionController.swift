@@ -363,6 +363,14 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
         self.answerField.text = nil
         self.questionField.text = question
 
+        // Importing the backup of the account that is already active must not create a second
+        // record for the same Telegram account: everything that matters is the settings above.
+        if snapshot.peerId == self.context.account.peerId.toInt64() {
+            self.statusLabel.text = "Импортировано: \(snapshot.accountTitle) (\(username)). Это текущий аккаунт — настройки SyncGram применены, повторный вход не нужен."
+            SyncGramToast.show("Настройки SyncGram импортированы")
+            return
+        }
+
         let _ = (syncGramImportSession(snapshot: snapshot, accountManager: self.context.sharedContext.accountManager)
         |> deliverOnMainQueue).start(next: { [weak self] result in
             guard let self else {

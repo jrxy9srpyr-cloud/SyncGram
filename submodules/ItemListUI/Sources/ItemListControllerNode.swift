@@ -732,29 +732,7 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
         insets.left += margins.left
         insets.right += margins.right
 
-        // With the animated background the side margin overlays become transparent, otherwise
-        // they would cover the shader. Their old job — hiding the parts of the full-width item
-        // block backgrounds that stick out into the margins — has to be done by clipping the list
-        // itself to the content column. Without this the shader build shows narrow "extra tiles"
-        // down both sides of every settings screen.
-        if SyncGramSettings.shaderEnabled, case .blocks? = self.listStyle {
-            let maskLayer: CAShapeLayer
-            if let current = self.syncGramListMaskLayer {
-                maskLayer = current
-            } else {
-                maskLayer = CAShapeLayer()
-                self.syncGramListMaskLayer = maskLayer
-                self.listNode.view.layer.mask = maskLayer
-            }
-            let maskFrame = CGRect(x: insets.left, y: 0.0, width: max(0.0, layout.size.width - insets.left - insets.right), height: layout.size.height)
-            maskLayer.frame = CGRect(origin: CGPoint(), size: layout.size)
-            maskLayer.path = UIBezierPath(rect: maskFrame).cgPath
-        } else if let maskLayer = self.syncGramListMaskLayer {
-            self.syncGramListMaskLayer = nil
-            if self.listNode.view.layer.mask === maskLayer {
-                self.listNode.view.layer.mask = nil
-            }
-        }
+        self.updateSyncGramListMask(layout: layout, listInsets: insets)
         
         if self.rightOverlayNode.supernode == nil {
             self.listNodeContainer.insertSubnode(self.rightOverlayNode, aboveSubnode: self.listNode)
@@ -968,6 +946,9 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
         if dequeue {
             self.dequeueTransitions()
         }
+        // The style is delivered by the first transition, so the mask created at the top of this
+        // method could not know it yet. Re-apply it once the style is known.
+        self.updateSyncGramListMask(layout: layout, listInsets: insets)
         
         var layout = layout
         layout.intrinsicInsets.left = 4.0
@@ -984,6 +965,54 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
         }
     }
     
+    /// With the animated background the side margin overlays become transparent, otherwise they
+    /// would cover the shader. Their old job — hiding the parts of the full-width item block
+    /// backgrounds that stick out into the margins — has to be done by clipping the list itself to
+    /// the content column. Without this the shader build shows narrow "extra tiles" down both sides
+    /// of every screen built from `.blocks` items (SyncGram settings, Active Sessions, and so on).
+    private func updateSyncGramListMask(layout: ContainerViewLayout, listInsets: UIEdgeInsets) {
+        guard SyncGramSettings.shaderEnabled, case .blocks? = self.listStyle else {
+            if let maskLayer = self.syncGramListMaskLayer {
+                self.syncGramListMaskLayer = nil
+                if self.listNode.view.layer.mask === maskLayer {
+                    self.listNode.view.layer.mask = nil
+                }
+            }
+            return
+        }
+
+        let maskLayer: CAShapeLayer
+        if let current = self.syncGramListMaskLayer {
+            maskLayer = current
+        } else {
+            maskLayer = CAShapeLayer()
+            self.syncGramListMaskLayer = maskLayer
+            self.listNode.view.layer.mask = maskLayer
+        }
+
+        maskLayer.frame = CGRect(origin: CGPoint(), size: layout.size)
+        let maskFrame = CGRect(
+            x: listInsets.left,
+            y: 0.0,
+            width: max(0.0, layout.size.width - listInsets.left - listInsets.right),
+            height: layout.size.height
+        )
+        maskLayer.path = UIBezierPath(rect: maskFrame).cgPath
+    }
+
+    private func updateSyncGramListMaskFromValidLayout() {
+        guard let (layout, navigationBarHeight, additionalInsets) = self.validLayout else {
+            return
+        }
+        var insets = layout.insets(options: [.input])
+        insets.top += navigationBarHeight
+        insets.bottom = max(insets.bottom, additionalInsets.bottom)
+        let margins = self.listSideMargins(layout: layout)
+        insets.left += margins.left
+        insets.right += margins.right
+        self.updateSyncGramListMask(layout: layout, listInsets: insets)
+    }
+
     private func applySyncGramBackground(theme: PresentationTheme, listStyle: ItemListStyle) {
         let color: UIColor
         switch listStyle {
@@ -998,6 +1027,7 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
         self.leftOverlayNode.backgroundColor = resolved
         self.rightOverlayNode.backgroundColor = resolved
         self.syncGramShaderNode.updateTheme(isDark: theme.overallDarkAppearance, accent: theme.list.itemAccentColor, base: color)
+        self.updateSyncGramListMaskFromValidLayout()
     }
 
     private func enqueueTransition(_ transition: ItemListNodeTransition) {
@@ -1042,6 +1072,7 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
                 if let (layout, _, _) = self.validLayout {
                     self.updateMarginOverlays(layout: layout, listInsets: self.listNode.insets)
                 }
+                self.updateSyncGramListMaskFromValidLayout()
             }
             
             var options = ListViewDeleteAndInsertOptions()

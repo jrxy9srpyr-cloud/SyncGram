@@ -131,7 +131,7 @@ public enum SyncGramSessionArchive {
         guard header.version <= self.fileVersion else {
             throw SyncGramSessionArchiveError.unsupportedVersion
         }
-        guard header.iterations > 0 else {
+        guard header.iterations > 0, header.iterations <= 2_000_000 else {
             throw SyncGramSessionArchiveError.invalidFile
         }
         return header

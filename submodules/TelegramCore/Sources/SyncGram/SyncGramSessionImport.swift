@@ -24,6 +24,10 @@ public func syncGramImportSession(snapshot: SyncGramSessionSnapshot, accountMana
         for record in transaction.getRecords() {
             for attribute in record.attributes {
                 if case let .backupData(value) = attribute, value.data?.peerId == snapshot.peerId {
+                    // The account is already here. Make it current in the same transaction so the
+                    // account manager can switch to it even before the caller's `switchToAccount`.
+                    transaction.setCurrentId(record.id)
+                    transaction.removeAuth()
                     return .existing(record.id)
                 }
             }
@@ -44,6 +48,13 @@ public func syncGramImportSession(snapshot: SyncGramSessionSnapshot, accountMana
             .backupData(AccountBackupDataAttribute(data: backupData))
         ]
         let id = transaction.createRecord(attributes)
+        // Set the imported account as current inside the same transaction as `createRecord`. This
+        // way the account manager's records view already knows the primary id when it first picks
+        // up the new record, and the account is switched to as soon as it finishes loading.
+        transaction.setCurrentId(id)
+        // An import usually happens from the login screen, where an unauthorized account is
+        // current; drop it so the app does not stay on the authorization screen.
+        transaction.removeAuth()
         return .created(id)
     }
 }
