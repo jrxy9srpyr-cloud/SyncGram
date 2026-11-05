@@ -159,7 +159,7 @@ private func syncGramStreamMakePreview(context: AccountContext, theme: Presentat
 
     if file.isVideo || file.isAnimated {
         let imageNode = TransformImageNode()
-        imageNode.setSignal(mediaGridMessageVideo(postbox: context.account.postbox, userLocation: userLocation, videoReference: .standalone(media: file), synchronousLoad: false, autoFetchFullSizeThumbnail: true, useMiniThumbnailIfAvailable: true, blurred: false))
+        imageNode.setSignal(chatMessageImageFile(account: context.account, userLocation: userLocation, fileReference: .standalone(media: file), thumbnail: true, autoFetchFullSizeThumbnail: true))
         let view = UIView()
         view.clipsToBounds = true
         view.layer.cornerRadius = 12.0
