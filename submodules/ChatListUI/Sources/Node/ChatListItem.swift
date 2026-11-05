@@ -5412,11 +5412,16 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                         backgroundColor = theme.itemSelectedBackgroundColor
                         highlightedBackgroundColor = theme.itemHighlightedBackgroundColor
                     } else if isPinned {
+                        // Pinned rows («Избранное», «Архив», pinned chats) used to be a solid theme
+                        // block. With the live background behind the list that block reads as the old
+                        // static Telegram background, so keep only a translucent tint and let the
+                        // shader show through.
+                        let pinnedBackgroundColor = SyncGramSettings.shaderEnabled ? theme.pinnedItemBackgroundColor.withAlphaComponent(0.35) : theme.pinnedItemBackgroundColor
                         if case let .groupReference(groupReferenceData) = item.content, groupReferenceData.hiddenByDefault {
-                            backgroundColor = groupReferenceData.appearsPinned ? theme.pinnedItemBackgroundColor : theme.itemBackgroundColor
+                            backgroundColor = groupReferenceData.appearsPinned ? pinnedBackgroundColor : theme.itemBackgroundColor
                             highlightedBackgroundColor = groupReferenceData.appearsPinned ? theme.pinnedItemHighlightedBackgroundColor : theme.itemHighlightedBackgroundColor
                         } else {
-                            backgroundColor = theme.pinnedItemBackgroundColor
+                            backgroundColor = pinnedBackgroundColor
                             highlightedBackgroundColor = theme.pinnedItemHighlightedBackgroundColor
                         }
                     } else {

@@ -24,6 +24,7 @@ import UndoUI
 import NewSessionInfoScreen
 import PresentationDataUtils
 import GlobalControlPanelsContext
+import SyncGramUI
 
 public enum ChatListNodeMode {
     case chatList(appendContacts: Bool)
@@ -1235,6 +1236,12 @@ public final class ChatListNode: ListViewImpl {
     private var didSetReady = false
     private var syncGramChatListScaleObserver: NSObjectProtocol?
     private var syncGramStreamRowObserver: NSObjectProtocol?
+    /// The live background sits directly behind the rows of a chat list. Hosting it inside the list
+    /// (rather than only on the controller) means every chat list - the main one, «Избранное»,
+    /// «Архив» and folder tabs - shows it even if an opaque container exists above the controller's
+    /// own background node.
+    private var syncGramShaderNode: SyncGramShaderNode?
+    private var syncGramShaderObserver: NSObjectProtocol?
     public var ready: Signal<Bool, NoError> {
         return _ready.get()
     }
@@ -1436,6 +1443,31 @@ public final class ChatListNode: ListViewImpl {
         
         super.init()
         
+        // The live background is drawn directly behind the rows of every chat list. Keeping it
+        // here, as the lowest subnode, means «Избранное», «Архив» and folder tabs get the same
+        // animated background as the main list, no matter what opaque container sits above the
+        // controller's own background node.
+        if case .chatList = mode {
+            let shaderNode = SyncGramShaderNode()
+            shaderNode.updateTheme(isDark: theme.overallDarkAppearance, accent: theme.list.itemAccentColor, base: theme.chatList.backgroundColor)
+            self.syncGramShaderNode = shaderNode
+            self.insertSubnode(shaderNode, at: 0)
+            self.syncGramShaderObserver = NotificationCenter.default.addObserver(forName: SyncGramNotificationNames.shaderChanged, object: nil, queue: .main, using: { [weak self] _ in
+                guard let self else {
+                    return
+                }
+                // Re-create the row models so pinned rows pick up the new translucent background
+                // (their colour is decided in `ChatListItem.asyncLayout`, not in `layout()`).
+                let current = self.currentState.presentationData
+                self.updateState { state in
+                    var state = state
+                    state.presentationData = ChatListPresentationData(theme: current.theme, fontSize: current.fontSize, strings: current.strings, dateTimeFormat: current.dateTimeFormat, nameSortOrder: current.nameSortOrder, nameDisplayOrder: current.nameDisplayOrder, disableAnimations: current.disableAnimations)
+                    return state
+                }
+                self.setNeedsLayout()
+            })
+        }
+
         if case .internal = context.sharedContext.applicationBindings.appBuildType {
             //self.useMainQueueTransactions = true
         }
@@ -3233,11 +3265,21 @@ public final class ChatListNode: ListViewImpl {
         self.view.addGestureRecognizer(selectionRecognizer)
     }
     
+    override public func layout() {
+        super.layout()
+        if let shaderNode = self.syncGramShaderNode {
+            shaderNode.frame = CGRect(origin: CGPoint(), size: self.bounds.size)
+        }
+    }
+
     deinit {
         if let observer = self.syncGramChatListScaleObserver {
             NotificationCenter.default.removeObserver(observer)
         }
         if let observer = self.syncGramStreamRowObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = self.syncGramShaderObserver {
             NotificationCenter.default.removeObserver(observer)
         }
         self.chatListDisposable.dispose()
@@ -3351,8 +3393,9 @@ public final class ChatListNode: ListViewImpl {
     public func updateThemeAndStrings(theme: PresentationTheme, fontSize: PresentationFontSize, strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, nameSortOrder: PresentationPersonNameOrder, nameDisplayOrder: PresentationPersonNameOrder, disableAnimations: Bool) {
         if theme !== self.currentState.presentationData.theme || strings !== self.currentState.presentationData.strings || dateTimeFormat != self.currentState.presentationData.dateTimeFormat {
             self.theme = theme
+            self.syncGramShaderNode?.updateTheme(isDark: theme.overallDarkAppearance, accent: theme.list.itemAccentColor, base: theme.chatList.backgroundColor)
             if self.keepTopItemOverscrollBackground != nil {
-                self.keepTopItemOverscrollBackground = ListViewKeepTopItemOverscrollBackground(color:  theme.chatList.pinnedItemBackgroundColor, direction: true)
+                self.keepTopItemOverscrollBackground = ListViewKeepTopItemOverscrollBackground(color:  theme.chatList.pinnedItemBackgroundColor.withAlphaComponent(SyncGramSettings.shaderEnabled ? 0.35 : 1.0), direction: true)
             }
             self.verticalScrollIndicatorColor = theme.list.scrollIndicatorColor
             
@@ -3468,7 +3511,7 @@ public final class ChatListNode: ListViewImpl {
                     
                     if pinnedOverscroll != (strongSelf.keepTopItemOverscrollBackground != nil) {
                         if pinnedOverscroll {
-                            strongSelf.keepTopItemOverscrollBackground = ListViewKeepTopItemOverscrollBackground(color: strongSelf.theme.chatList.pinnedItemBackgroundColor, direction: true)
+                            strongSelf.keepTopItemOverscrollBackground = ListViewKeepTopItemOverscrollBackground(color: strongSelf.theme.chatList.pinnedItemBackgroundColor.withAlphaComponent(SyncGramSettings.shaderEnabled ? 0.35 : 1.0), direction: true)
                         } else {
                             strongSelf.keepTopItemOverscrollBackground = nil
                         }
@@ -3704,6 +3747,11 @@ public final class ChatListNode: ListViewImpl {
     private var previousStoriesInset: CGFloat?
     
     public func updateLayout(transition: ContainedViewLayoutTransition, updateSizeAndInsets: ListViewUpdateSizeAndInsets, visibleTopInset: CGFloat, originalTopInset: CGFloat, storiesInset: CGFloat, inlineNavigationLocation: ChatListControllerLocation?, inlineNavigationTransitionFraction: CGFloat) {
+        // The shader is a plain subnode of the list, so it has to follow the list size explicitly:
+        // `ListViewImpl` configures its scroller instead of relying on `layout()`.
+        if let shaderNode = self.syncGramShaderNode {
+            shaderNode.frame = CGRect(origin: CGPoint(), size: updateSizeAndInsets.size)
+        }
         //print("inset: \(updateSizeAndInsets.insets.top)")
         
         var highlightedLocation: ChatListHighlightedLocation?
