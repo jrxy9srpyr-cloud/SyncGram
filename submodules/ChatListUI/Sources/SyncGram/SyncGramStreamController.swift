@@ -8,6 +8,11 @@ import TelegramPresentationData
 import SyncGramUI
 import AccountContext
 import AvatarNode
+import TextNodeWithEntities
+import TextFormat
+import AnimatedStickerNode
+import TelegramAnimatedStickerNode
+import PhotoResources
 
 private struct SyncGramStreamItem {
     let accountId: AccountRecordId
@@ -16,7 +21,13 @@ private struct SyncGramStreamItem {
     let chatTitle: String
     let authorName: String
     let authorPeer: EnginePeer?
-    let text: String
+    /// Description for media that has no visual preview (voice, file, poll, location, ...).
+    let mediaText: String
+    /// The raw message text, rendered with `TextNodeWithEntities` so custom emoji stay animated.
+    let plainText: String
+    let textEntities: [MessageTextEntity]
+    let message: Message
+    let media: Media?
     let timestamp: Int32
     let peerId: EnginePeer.Id
     let messageId: EngineMessage.Id
@@ -79,27 +90,118 @@ private func syncGramStreamMediaText(_ message: Message) -> String {
     return "📎 Вложение"
 }
 
+/// A media preview inside a stream bubble. Photos, videos, GIFs and ordinary stickers show a
+/// still thumbnail; animated stickers get a real looping `AnimatedStickerNode`.
+private final class SyncGramStreamMediaPreview {
+    let view: UIView
+    let imageNode: TransformImageNode?
+    let animationNode: AnimatedStickerNode?
+    let imageSize: CGSize
+    let aspectRatio: CGFloat
+
+    init(view: UIView, imageNode: TransformImageNode?, animationNode: AnimatedStickerNode?, imageSize: CGSize, aspectRatio: CGFloat) {
+        self.view = view
+        self.imageNode = imageNode
+        self.animationNode = animationNode
+        self.imageSize = imageSize
+        self.aspectRatio = aspectRatio
+    }
+}
+
+private func syncGramStreamMakePreview(context: AccountContext, theme: PresentationTheme, media: Media?) -> SyncGramStreamMediaPreview? {
+    guard let media = media else {
+        return nil
+    }
+    let userLocation = MediaResourceUserLocation.peer(context.account.peerId)
+
+    if let image = media as? TelegramMediaImage {
+        let dimensions = largestImageRepresentation(image.representations)?.dimensions.cgSize ?? CGSize(width: 512.0, height: 512.0)
+        let imageNode = TransformImageNode()
+        imageNode.setSignal(chatMessagePhotoThumbnail(account: context.account, userLocation: userLocation, photoReference: .standalone(media: image), onlyFullSize: false, blurred: false))
+        let view = UIView()
+        view.clipsToBounds = true
+        view.layer.cornerRadius = 12.0
+        view.backgroundColor = theme.list.mediaPlaceholderColor
+        view.addSubview(imageNode.view)
+        return SyncGramStreamMediaPreview(view: view, imageNode: imageNode, animationNode: nil, imageSize: dimensions, aspectRatio: max(0.4, min(1.6, dimensions.height / max(1.0, dimensions.width))))
+    }
+
+    guard let file = media as? TelegramMediaFile else {
+        return nil
+    }
+
+    let dimensions = file.dimensions?.cgSize ?? CGSize(width: 512.0, height: 512.0)
+    let aspectRatio = max(0.4, min(1.6, dimensions.height / max(1.0, dimensions.width)))
+
+    if file.isSticker && (file.isAnimated || file.isVideoSticker) {
+        let fittedDimensions = dimensions.aspectFitted(CGSize(width: 220.0, height: 220.0))
+        let animationNode = DefaultAnimatedStickerNodeImpl(lottieSettings: context.lottieRenderingSettings)
+        animationNode.autoplay = true
+        let pathPrefix = context.engine.resources.shortLivedResourceCachePathPrefix(id: EngineMediaResource.Id(file.resource.id))
+        animationNode.setup(source: AnimatedStickerResourceSource(account: context.account, resource: file.resource, isVideo: file.isVideoSticker || file.mimeType == "video/webm"), width: Int(max(2.0, fittedDimensions.width)), height: Int(max(2.0, fittedDimensions.height)), playbackMode: .loop, mode: .direct(cachePathPrefix: pathPrefix))
+        animationNode.visibility = true
+        animationNode.view.isUserInteractionEnabled = false
+        let view = UIView()
+        view.clipsToBounds = true
+        view.addSubview(animationNode.view)
+        return SyncGramStreamMediaPreview(view: view, imageNode: nil, animationNode: animationNode, imageSize: dimensions, aspectRatio: 1.0)
+    }
+
+    if file.isSticker {
+        let imageNode = TransformImageNode()
+        imageNode.setSignal(chatMessageImageFile(account: context.account, userLocation: userLocation, fileReference: .standalone(media: file), thumbnail: true))
+        let view = UIView()
+        view.clipsToBounds = true
+        view.backgroundColor = .clear
+        view.addSubview(imageNode.view)
+        return SyncGramStreamMediaPreview(view: view, imageNode: imageNode, animationNode: nil, imageSize: dimensions, aspectRatio: 1.0)
+    }
+
+    if file.isVideo || file.isAnimated {
+        let imageNode = TransformImageNode()
+        imageNode.setSignal(mediaGridMessageVideo(postbox: context.account.postbox, userLocation: userLocation, videoReference: .standalone(media: file), synchronousLoad: false, autoFetchFullSizeThumbnail: true, useMiniThumbnailIfAvailable: true, blurred: false))
+        let view = UIView()
+        view.clipsToBounds = true
+        view.layer.cornerRadius = 12.0
+        view.backgroundColor = theme.list.mediaPlaceholderColor
+        view.addSubview(imageNode.view)
+        return SyncGramStreamMediaPreview(view: view, imageNode: imageNode, animationNode: nil, imageSize: dimensions, aspectRatio: aspectRatio)
+    }
+
+    return nil
+}
+
 /// A single chat bubble in the aggregated "Поток" conversation. Laid out by hand so the author,
-/// context, message, time and the optional avatar can never overlap one another.
+/// context, media, message, time and the optional avatar can never overlap one another. Message
+/// text is rendered by `TextNodeWithEntities`, which turns custom emoji entities into animated
+/// inline stickers instead of dropping them to plain Unicode glyphs.
 private final class SyncGramStreamMessageView: UIControl {
     private let bubbleView = UIView()
     private let avatarNode: AvatarNode?
     private let authorLabel = UILabel()
     private let contextLabel = UILabel()
-    private let textLabel = UILabel()
+    private let mediaLabel = UILabel()
     private let timeLabel = UILabel()
     private let trashView = UIImageView()
+    private let textNode = TextNodeWithEntities()
+    private let textAttributedString: NSAttributedString
+    private let preview: SyncGramStreamMediaPreview?
+    private let theme: PresentationTheme
 
     let item: SyncGramStreamItem
     private let incoming: Bool
     private let contextText: String
+    private let hasText: Bool
 
     init(item: SyncGramStreamItem, theme: PresentationTheme) {
         self.item = item
+        self.theme = theme
         self.incoming = !item.isOutgoing
 
         let contextParts = [item.chatTitle, item.accountTitle].filter { !$0.isEmpty }
         self.contextText = (contextParts.isEmpty ? "" : contextParts.joined(separator: " · ")) + (item.threadId != nil ? " · тема" : "")
+
+        let colors = item.isOutgoing ? theme.chat.message.outgoing : theme.chat.message.incoming
 
         let avatarNode: AvatarNode?
         if let peer = item.authorPeer {
@@ -110,15 +212,33 @@ private final class SyncGramStreamMessageView: UIControl {
         }
         self.avatarNode = avatarNode
 
+        let textFont = Font.regular(15.0)
+        self.hasText = !item.plainText.isEmpty
+        self.textAttributedString = stringWithAppliedEntities(
+            item.plainText,
+            entities: item.textEntities,
+            baseColor: colors.primaryTextColor,
+            linkColor: colors.accentTextColor,
+            baseFont: textFont,
+            linkFont: textFont,
+            boldFont: Font.semibold(15.0),
+            italicFont: Font.italic(15.0),
+            boldItalicFont: Font.semiboldItalic(15.0),
+            fixedFont: Font.with(size: 15.0, design: .monospace),
+            blockQuoteFont: textFont,
+            message: item.message
+        )
+        self.preview = syncGramStreamMakePreview(context: item.accountContext, theme: theme, media: item.media)
+
         super.init(frame: .zero)
 
-        let colors = incoming ? theme.chat.message.incoming : theme.chat.message.outgoing
-        self.bubbleView.backgroundColor = colors.bubble.withoutWallpaper.fill.first ?? theme.list.itemBlocksBackgroundColor
+        let bubbleColors = item.isOutgoing ? theme.chat.message.outgoing : theme.chat.message.incoming
+        self.bubbleView.backgroundColor = bubbleColors.bubble.withoutWallpaper.fill.first ?? theme.list.itemBlocksBackgroundColor
         self.bubbleView.isUserInteractionEnabled = false
         self.bubbleView.layer.cornerRadius = 15.0
-        self.bubbleView.layer.maskedCorners = incoming
-            ? [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
-            : [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner]
+        self.bubbleView.layer.maskedCorners = item.isOutgoing
+            ? [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner]
+            : [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
         self.addSubview(self.bubbleView)
 
         if let avatarNode = avatarNode {
@@ -139,12 +259,22 @@ private final class SyncGramStreamMessageView: UIControl {
         self.contextLabel.lineBreakMode = .byTruncatingTail
         self.bubbleView.addSubview(self.contextLabel)
 
-        self.textLabel.text = item.text
-        self.textLabel.font = Font.regular(15.0)
-        self.textLabel.textColor = colors.primaryTextColor
-        self.textLabel.numberOfLines = 0
-        self.textLabel.lineBreakMode = .byWordWrapping
-        self.bubbleView.addSubview(self.textLabel)
+        self.mediaLabel.text = item.mediaText
+        self.mediaLabel.font = Font.regular(13.0)
+        self.mediaLabel.textColor = colors.secondaryTextColor
+        self.mediaLabel.numberOfLines = 1
+        self.mediaLabel.lineBreakMode = .byTruncatingTail
+        self.mediaLabel.isHidden = item.mediaText.isEmpty || self.preview != nil
+        self.bubbleView.addSubview(self.mediaLabel)
+
+        self.textNode.textNode.isUserInteractionEnabled = false
+        self.textNode.textNode.displaysAsynchronously = true
+        self.textNode.visibilityRect = CGRect.infinite
+        self.bubbleView.addSubview(self.textNode.textNode.view)
+
+        if let preview = self.preview {
+            self.bubbleView.addSubview(preview.view)
+        }
 
         self.timeLabel.font = Font.regular(11.0)
         self.timeLabel.textColor = colors.secondaryTextColor
@@ -184,18 +314,67 @@ private final class SyncGramStreamMessageView: UIControl {
         let authorHeight = self.authorLabel.sizeThatFits(CGSize(width: maximumContentWidth, height: .greatestFiniteMagnitude)).height
         let contextHeight = self.contextLabel.sizeThatFits(CGSize(width: maximumContentWidth, height: .greatestFiniteMagnitude)).height
 
+        let makeTextLayout = TextNodeWithEntities.asyncLayout(self.textNode)
+        var textLayout: TextNodeLayout?
+        var textApply: ((TextNodeWithEntities.Arguments?) -> TextNodeWithEntities)?
+        var measuredTextWidth: CGFloat = 0.0
+        if self.hasText {
+            let (probeLayout, _) = makeTextLayout(TextNodeLayoutArguments(
+                attributedString: self.textAttributedString,
+                backgroundColor: nil,
+                maximumNumberOfLines: 0,
+                truncationType: .end,
+                constrainedSize: CGSize(width: maximumContentWidth, height: .greatestFiniteMagnitude),
+                alignment: .natural,
+                cutout: nil,
+                insets: UIEdgeInsets()
+            ))
+            measuredTextWidth = ceil(probeLayout.size.width)
+            let textWidth = max(120.0, min(maximumContentWidth, measuredTextWidth))
+            let (layout, apply) = makeTextLayout(TextNodeLayoutArguments(
+                attributedString: self.textAttributedString,
+                backgroundColor: nil,
+                maximumNumberOfLines: 0,
+                truncationType: .end,
+                constrainedSize: CGSize(width: textWidth, height: .greatestFiniteMagnitude),
+                alignment: .natural,
+                cutout: nil,
+                insets: UIEdgeInsets()
+            ))
+            textLayout = layout
+            textApply = apply
+        }
+
         let trashWidth: CGFloat = self.item.isDeleted ? 14.0 : 0.0
         let timeSize = self.timeLabel.sizeThatFits(CGSize(width: maximumContentWidth, height: .greatestFiniteMagnitude))
-        let measuredTextWidth = min(maximumContentWidth, ceil(self.textLabel.intrinsicContentSize.width))
-        let measuredAuthorWidth = min(maximumContentWidth, ceil(self.authorLabel.intrinsicContentSize.width))
-        let desiredContentWidth = max(measuredTextWidth, measuredAuthorWidth, timeSize.width + trashWidth + 4.0)
+        let mediaLabelWidth = self.mediaLabel.isHidden ? 0.0 : ceil(self.mediaLabel.sizeThatFits(CGSize(width: maximumContentWidth, height: .greatestFiniteMagnitude)).width)
+        var desiredContentWidth = max(measuredTextWidth, mediaLabelWidth, timeSize.width + trashWidth + 4.0)
+        if self.preview != nil {
+            desiredContentWidth = max(desiredContentWidth, min(maximumContentWidth, 200.0))
+        }
         let contentWidth = max(120.0, min(maximumContentWidth, desiredContentWidth))
 
-        let textHeight = self.textLabel.sizeThatFits(CGSize(width: contentWidth, height: .greatestFiniteMagnitude)).height
+        let textHeight = textLayout?.size.height ?? 0.0
+        let mediaLabelHeight = self.mediaLabel.isHidden ? 0.0 : ceil(self.mediaLabel.sizeThatFits(CGSize(width: contentWidth, height: .greatestFiniteMagnitude)).height)
+        var previewSize = CGSize.zero
+        if let preview = self.preview {
+            previewSize = CGSize(width: contentWidth, height: min(190.0, max(90.0, contentWidth * preview.aspectRatio)))
+        }
+
         let footerHeight = max(timeSize.height, 12.0)
 
         let bubbleWidth = contentWidth + bubbleInsets.left + bubbleInsets.right
-        let bubbleHeight = bubbleInsets.top + authorHeight + 1.0 + contextHeight + 3.0 + textHeight + 4.0 + footerHeight + bubbleInsets.bottom
+        var bubbleHeight = bubbleInsets.top + authorHeight + 1.0 + contextHeight + 3.0
+        if previewSize.height > 0.0 {
+            bubbleHeight += previewSize.height + 4.0
+        }
+        if mediaLabelHeight > 0.0 {
+            bubbleHeight += mediaLabelHeight + 3.0
+        }
+        if textHeight > 0.0 {
+            bubbleHeight += textHeight + 4.0
+        }
+        bubbleHeight += footerHeight + bubbleInsets.bottom
 
         let bubbleX: CGFloat
         if self.incoming {
@@ -214,9 +393,40 @@ private final class SyncGramStreamMessageView: UIControl {
         let contentX = bubbleInsets.left
         self.authorLabel.frame = CGRect(x: contentX, y: bubbleInsets.top, width: contentWidth, height: authorHeight)
         self.contextLabel.frame = CGRect(x: contentX, y: self.authorLabel.frame.maxY + 1.0, width: contentWidth, height: contextHeight)
-        self.textLabel.frame = CGRect(x: contentX, y: self.contextLabel.frame.maxY + 3.0, width: contentWidth, height: textHeight)
 
-        let footerY = self.textLabel.frame.maxY + 4.0
+        var contentY = self.contextLabel.frame.maxY + 3.0
+        if let preview = self.preview, previewSize.height > 0.0 {
+            preview.view.frame = CGRect(x: contentX, y: contentY, width: previewSize.width, height: previewSize.height)
+            if let imageNode = preview.imageNode {
+                imageNode.frame = CGRect(origin: CGPoint(), size: previewSize)
+                let apply = imageNode.asyncLayout()(TransformImageArguments(corners: ImageCorners(radius: 12.0), imageSize: preview.imageSize.aspectFilled(previewSize), boundingSize: previewSize, intrinsicInsets: UIEdgeInsets()))
+                apply()
+            }
+            if let animationNode = preview.animationNode {
+                animationNode.frame = CGRect(origin: CGPoint(), size: previewSize)
+                animationNode.updateLayout(size: previewSize)
+            }
+            contentY += previewSize.height + 4.0
+        }
+
+        if !self.mediaLabel.isHidden {
+            self.mediaLabel.frame = CGRect(x: contentX, y: contentY, width: contentWidth, height: mediaLabelHeight)
+            contentY += mediaLabelHeight + 3.0
+        }
+
+        if let textLayout = textLayout, let textApply = textApply {
+            self.textNode.textNode.frame = CGRect(x: contentX, y: contentY, width: contentWidth, height: textLayout.size.height)
+            let _ = textApply(TextNodeWithEntities.Arguments(
+                context: self.item.accountContext,
+                cache: self.item.accountContext.animationCache,
+                renderer: self.item.accountContext.animationRenderer,
+                placeholderColor: self.theme.list.mediaPlaceholderColor,
+                attemptSynchronous: false
+            ))
+            contentY += textLayout.size.height + 4.0
+        }
+
+        let footerY = contentY
         let timeWidth = timeSize.width
         let timeX = contentX + contentWidth - timeWidth
         self.timeLabel.frame = CGRect(x: timeX, y: footerY + (footerHeight - timeSize.height) / 2.0, width: timeWidth, height: timeSize.height)
@@ -403,13 +613,11 @@ public final class SyncGramStreamController: ViewController {
                         let chatTitle = chatPeer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? "Чат"
                         let authorPeer = message.author.flatMap { EnginePeer($0) } ?? chatPeer
                         let authorName = authorPeer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? chatTitle
-                        let mediaText = syncGramStreamMediaText(message)
-                        let text: String
-                        if !message.text.isEmpty {
-                            text = mediaText.isEmpty ? message.text : mediaText + "\n" + message.text
-                        } else {
-                            text = mediaText.isEmpty ? "[сообщение]" : mediaText
+                        var mediaText = syncGramStreamMediaText(message)
+                        if mediaText.isEmpty && message.text.isEmpty {
+                            mediaText = "[сообщение]"
                         }
+                        let textEntities = message.attributes.compactMap({ $0 as? TextEntitiesMessageAttribute }).first?.entities ?? []
                         result.append(SyncGramStreamItem(
                             accountId: accountId,
                             accountContext: accountContext,
@@ -417,7 +625,11 @@ public final class SyncGramStreamController: ViewController {
                             chatTitle: chatTitle,
                             authorName: authorName,
                             authorPeer: authorPeer,
-                            text: text,
+                            mediaText: mediaText,
+                            plainText: message.text,
+                            textEntities: textEntities,
+                            message: message,
+                            media: message.media.first,
                             timestamp: message.timestamp,
                             peerId: message.id.peerId,
                             messageId: message.id,

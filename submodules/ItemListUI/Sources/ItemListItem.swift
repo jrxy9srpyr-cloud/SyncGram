@@ -1,6 +1,8 @@
 import Foundation
 import UIKit
+import AsyncDisplayKit
 import Display
+import TelegramCore
 import TelegramUIPreferences
 import TelegramPresentationData
 
@@ -131,6 +133,47 @@ public func itemListNeighborsGroupedInsets(_ neighbors: ItemListNeighbors, _ par
 
 public func itemListHasRoundedBlockLayout(_ params: ListViewItemLayoutParams) -> Bool {
     return params.width >= 320.0
+}
+
+/// Shared handling for the animated background.
+///
+/// A `.blocks` row paints its background across the full width of the list, and a per-row
+/// `maskNode` image normally paints the page background over the square corners. With the shader
+/// behind the list that overlay is an opaque theme color, which shows up as black square corners
+/// around every rounded tile. When the shader is enabled the row background is instead inset to the
+/// content column and rounded, and the overlay is dropped. Returns `nil` when nothing needs to be
+/// changed, so callers on the normal (non-shader) path keep their existing frames and animations.
+public func itemListSyncGramBlockBackground(backgroundNode: ASDisplayNode, maskNode: ASImageNode, frame: CGRect, params: ListViewItemLayoutParams, hasTopCorners: Bool, hasBottomCorners: Bool, glass: Bool) -> CGRect? {
+    guard SyncGramSettings.shaderEnabled else {
+        if backgroundNode.layer.masksToBounds {
+            backgroundNode.layer.masksToBounds = false
+            backgroundNode.layer.cornerRadius = 0.0
+            backgroundNode.layer.maskedCorners = []
+        }
+        return nil
+    }
+
+    maskNode.image = nil
+
+    var maskedCorners: CACornerMask = []
+    if hasTopCorners {
+        maskedCorners.insert(.layerMinXMinYCorner)
+        maskedCorners.insert(.layerMaxXMinYCorner)
+    }
+    if hasBottomCorners {
+        maskedCorners.insert(.layerMinXMaxYCorner)
+        maskedCorners.insert(.layerMaxXMaxYCorner)
+    }
+    backgroundNode.layer.cornerRadius = glass ? 26.0 : 11.0
+    backgroundNode.layer.maskedCorners = maskedCorners
+    backgroundNode.layer.masksToBounds = !maskedCorners.isEmpty
+
+    return CGRect(
+        x: params.leftInset,
+        y: frame.minY,
+        width: max(0.0, params.width - params.leftInset - params.rightInset),
+        height: frame.height
+    )
 }
 
 public final class ItemListPresentationData: Equatable {

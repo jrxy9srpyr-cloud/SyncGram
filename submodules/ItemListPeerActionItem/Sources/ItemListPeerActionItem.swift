@@ -380,6 +380,9 @@ public final class ItemListPeerActionItemNode: ListViewItemNode, ItemListItemNod
                         // Per side: the margins differ beside iPhone Duo's strip; equal margins give the symmetric frame.
                         let backgroundFrame = strongSelf.backgroundNode.frame
                         strongSelf.maskNode.frame = CGRect(x: backgroundFrame.minX + params.leftInset, y: backgroundFrame.minY, width: backgroundFrame.width - params.leftInset - params.rightInset, height: backgroundFrame.height)
+                        if let adjustedFrame = itemListSyncGramBlockBackground(backgroundNode: strongSelf.backgroundNode, maskNode: strongSelf.maskNode, frame: strongSelf.backgroundNode.frame, params: params, hasTopCorners: hasTopCorners, hasBottomCorners: hasBottomCorners, glass: item.systemStyle == .glass) {
+                            strongSelf.backgroundNode.frame = adjustedFrame
+                        }
                         strongSelf.topStripeNode.frame = CGRect(origin: CGPoint(x: 0.0, y: -min(insets.top, separatorHeight)), size: CGSize(width: layoutSize.width, height: separatorHeight))
                         transition.updateFrame(node: strongSelf.bottomStripeNode, frame: CGRect(origin: CGPoint(x: bottomStripeInset, y: contentSize.height + bottomStripeOffset), size: CGSize(width: layoutSize.width - bottomStripeInset - separatorRightInset - params.rightInset, height: separatorHeight)))
                     }

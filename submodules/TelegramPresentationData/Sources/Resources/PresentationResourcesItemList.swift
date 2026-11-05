@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import Display
 import AppBundle
+import TelegramCore
 
 public func generateItemListCheckIcon(color: UIColor) -> UIImage? {
     return generateImage(CGSize(width: 12.0, height: 10.0), rotatedContext: { size, context in
@@ -363,18 +364,35 @@ public struct PresentationResourcesItemList {
         if !top && !bottom {
             return nil
         }
+        let shader = SyncGramSettings.shaderEnabled
         let key: PresentationResourceKey
         if top && bottom {
-            key = glass ? PresentationResourceKey.itemListCornersBothGlass : PresentationResourceKey.itemListCornersBoth
+            if shader {
+                key = glass ? PresentationResourceKey.itemListCornersBothGlassShader : PresentationResourceKey.itemListCornersBothShader
+            } else {
+                key = glass ? PresentationResourceKey.itemListCornersBothGlass : PresentationResourceKey.itemListCornersBoth
+            }
         } else if top {
-            key = glass ? PresentationResourceKey.itemListCornersTopGlass : PresentationResourceKey.itemListCornersTop
+            if shader {
+                key = glass ? PresentationResourceKey.itemListCornersTopGlassShader : PresentationResourceKey.itemListCornersTopShader
+            } else {
+                key = glass ? PresentationResourceKey.itemListCornersTopGlass : PresentationResourceKey.itemListCornersTop
+            }
         } else {
-            key = glass ? PresentationResourceKey.itemListCornersBottomGlass : PresentationResourceKey.itemListCornersBottom
+            if shader {
+                key = glass ? PresentationResourceKey.itemListCornersBottomGlassShader : PresentationResourceKey.itemListCornersBottomShader
+            } else {
+                key = glass ? PresentationResourceKey.itemListCornersBottomGlass : PresentationResourceKey.itemListCornersBottom
+            }
         }
         return theme.image(key.rawValue, { theme in
             return generateImage(CGSize(width: 56.0, height: 56.0), rotatedContext: { (size, context) in
                 let bounds = CGRect(origin: CGPoint(), size: size)
-                context.setFillColor(theme.list.blocksBackgroundColor.cgColor)
+                // The image paints the page colour over the square corners of a row. When the live
+                // shader is behind the list there is no flat page colour to paint, so the tile's own
+                // colour is used instead - the square corners become invisible instead of showing as
+                // black patches around every rounded tile.
+                context.setFillColor((SyncGramSettings.shaderEnabled ? theme.list.itemBlocksBackgroundColor : theme.list.blocksBackgroundColor).cgColor)
                 context.fill(bounds)
                 
                 context.setBlendMode(.clear)

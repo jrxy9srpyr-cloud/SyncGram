@@ -432,4 +432,11 @@ public enum PresentationResourceParameterKey: Hashable {
     case chatExpiredStoryIndicatorIcon(type: ChatExpiredStoryIndicatorType)
     case chatReplyStoryIndicatorIcon(type: ChatExpiredStoryIndicatorType)
     case chatReplyPollIndicatorIcon(type: ChatExpiredStoryIndicatorType)
+
+    case itemListCornersTopShader
+    case itemListCornersBottomShader
+    case itemListCornersBothShader
+    case itemListCornersTopGlassShader
+    case itemListCornersBottomGlassShader
+    case itemListCornersBothGlassShader
 }

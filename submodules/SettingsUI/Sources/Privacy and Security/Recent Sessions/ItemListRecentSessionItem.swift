@@ -507,6 +507,9 @@ class ItemListRecentSessionItemNode: ItemListRevealOptionsItemNode {
                     strongSelf.backgroundNode.frame = CGRect(origin: CGPoint(x: 0.0, y: -min(insets.top, separatorHeight)), size: CGSize(width: params.width, height: contentSize.height + min(insets.top, separatorHeight) + min(insets.bottom, separatorHeight)))
                     strongSelf.containerNode.frame = CGRect(origin: CGPoint(), size: strongSelf.backgroundNode.frame.size)
                     strongSelf.maskNode.frame = strongSelf.backgroundNode.frame.inset(by: UIEdgeInsets(top: 0.0, left: params.leftInset, bottom: 0.0, right: params.rightInset))
+                    if let adjustedFrame = itemListSyncGramBlockBackground(backgroundNode: strongSelf.backgroundNode, maskNode: strongSelf.maskNode, frame: strongSelf.backgroundNode.frame, params: params, hasTopCorners: hasTopCorners, hasBottomCorners: hasBottomCorners, glass: item.systemStyle == .glass) {
+                        strongSelf.backgroundNode.frame = adjustedFrame
+                    }
                     transition.updateFrame(node: strongSelf.topStripeNode, frame: CGRect(origin: CGPoint(x: 0.0, y: -min(insets.top, separatorHeight)), size: CGSize(width: layoutSize.width, height: separatorHeight)))
                     transition.updateFrame(node: strongSelf.bottomStripeNode, frame: CGRect(origin: CGPoint(x: bottomStripeInset, y: contentSize.height + bottomStripeOffset), size: CGSize(width: layoutSize.width - bottomStripeInset - params.rightInset - separatorRightInset, height: separatorHeight)))
                     
