@@ -381,6 +381,13 @@ public enum PresentationResourceKey: Int32 {
     case messageButtonsPostReject
     case messageButtonsPostApprove
     case messageButtonsPostEdit
+
+    case itemListCornersTopShader
+    case itemListCornersBottomShader
+    case itemListCornersBothShader
+    case itemListCornersTopGlassShader
+    case itemListCornersBottomGlassShader
+    case itemListCornersBothGlassShader
 }
 
 public enum ChatExpiredStoryIndicatorType: Hashable {
@@ -433,10 +440,4 @@ public enum PresentationResourceParameterKey: Hashable {
     case chatReplyStoryIndicatorIcon(type: ChatExpiredStoryIndicatorType)
     case chatReplyPollIndicatorIcon(type: ChatExpiredStoryIndicatorType)
 
-    case itemListCornersTopShader
-    case itemListCornersBottomShader
-    case itemListCornersBothShader
-    case itemListCornersTopGlassShader
-    case itemListCornersBottomGlassShader
-    case itemListCornersBothGlassShader
 }
