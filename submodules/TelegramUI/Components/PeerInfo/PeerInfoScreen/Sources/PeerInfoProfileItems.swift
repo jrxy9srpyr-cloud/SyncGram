@@ -16,6 +16,7 @@ import WebUI
 import AvatarNode
 import PeerNameColorItem
 import BoostLevelIconComponent
+import SettingsUI
 
 private let enabledPublicBioEntities: EnabledEntityTypes = [.allUrl, .mention, .hashtag]
 private let enabledPrivateBioEntities: EnabledEntityTypes = [.internalUrl, .mention, .hashtag]
@@ -904,6 +905,7 @@ func infoItems(
         let peerIdValue = peer.id.id._internalGetInt64Value()
         items[.peerInfo]!.append(PeerInfoScreenDisclosureItem(id: "SyncGramPeerId", label: .text("\(peerIdValue)"), text: "Peer ID", icon: nil, action: {
             UIPasteboard.general.string = "\(peerIdValue)"
+            SyncGramToast.show("Peer ID скопирован")
         }))
     }
     

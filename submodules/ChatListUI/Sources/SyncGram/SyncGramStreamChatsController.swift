@@ -180,12 +180,13 @@ public final class SyncGramStreamChatsController: ViewController {
             let signals: [Signal<[SyncGramStreamChatItem], NoError>] = accounts.map { accountId, accountContext, _ in
                 let peerSignal = accountContext.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: accountContext.account.peerId))
                 let listSignal = accountContext.account.viewTracker.tailChatListView(groupId: .root, count: 200)
-                return combineLatest(queue: .mainQueue(), peerSignal, listSignal)
-                |> map { peer, view -> [SyncGramStreamChatItem] in
+                let archiveSignal = accountContext.account.viewTracker.tailChatListView(groupId: Namespaces.PeerGroup.archive, count: 200)
+                return combineLatest(queue: .mainQueue(), peerSignal, listSignal, archiveSignal)
+                |> map { peer, view, archiveView -> [SyncGramStreamChatItem] in
                     let presentationData = accountContext.sharedContext.currentPresentationData.with { $0 }
                     let accountTitle = peer?.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder) ?? "Аккаунт"
                     var result: [SyncGramStreamChatItem] = []
-                    for entry in view.0.entries {
+                    for entry in view.0.entries + archiveView.0.entries {
                         guard case let .MessageEntry(data) = entry else { continue }
                         let avatarPeer = data.renderedPeer.peer.flatMap { EnginePeer($0) }
                         let chatTitle = avatarPeer?.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder) ?? "Чат"

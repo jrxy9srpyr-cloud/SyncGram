@@ -20,6 +20,7 @@ swift_library(
         "//submodules/ComponentFlow",
         "//submodules/AppBundle",
         "//submodules/ChatListUI",
+        "//submodules/SyncGramUI:SyncGramUI",
         "//submodules/TelegramUI/Components/PeerInfo/PeerInfoPaneNode",
         "//submodules/DeleteChatPeerActionSheetItem",
         "//submodules/UndoUI",

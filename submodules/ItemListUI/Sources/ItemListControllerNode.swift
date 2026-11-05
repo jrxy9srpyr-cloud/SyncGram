@@ -284,6 +284,7 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
     private var validLayout: (ContainerViewLayout, CGFloat, UIEdgeInsets)?
     private let syncGramShaderNode = SyncGramShaderNode()
     private var syncGramShaderObserver: NSObjectProtocol?
+    private var syncGramListMaskLayer: CAShapeLayer?
     
     private var theme: PresentationTheme?
     private var listStyle: ItemListStyle?
@@ -348,6 +349,7 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
             if let theme = self.theme, let listStyle = self.listStyle {
                 self.applySyncGramBackground(theme: theme, listStyle: listStyle)
             }
+            self.setNeedsLayout()
         })
 
         self.listNode.displayedItemRangeChanged = { [weak self] displayedRange, opaqueTransactionState in
@@ -729,6 +731,30 @@ open class ItemListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
         let margins = self.listSideMargins(layout: layout)
         insets.left += margins.left
         insets.right += margins.right
+
+        // With the animated background the side margin overlays become transparent, otherwise
+        // they would cover the shader. Their old job — hiding the parts of the full-width item
+        // block backgrounds that stick out into the margins — has to be done by clipping the list
+        // itself to the content column. Without this the shader build shows narrow "extra tiles"
+        // down both sides of every settings screen.
+        if SyncGramSettings.shaderEnabled, case .blocks? = self.listStyle {
+            let maskLayer: CAShapeLayer
+            if let current = self.syncGramListMaskLayer {
+                maskLayer = current
+            } else {
+                maskLayer = CAShapeLayer()
+                self.syncGramListMaskLayer = maskLayer
+                self.listNode.view.layer.mask = maskLayer
+            }
+            let maskFrame = CGRect(x: insets.left, y: 0.0, width: max(0.0, layout.size.width - insets.left - insets.right), height: layout.size.height)
+            maskLayer.frame = CGRect(origin: CGPoint(), size: layout.size)
+            maskLayer.path = UIBezierPath(rect: maskFrame).cgPath
+        } else if let maskLayer = self.syncGramListMaskLayer {
+            self.syncGramListMaskLayer = nil
+            if self.listNode.view.layer.mask === maskLayer {
+                self.listNode.view.layer.mask = nil
+            }
+        }
         
         if self.rightOverlayNode.supernode == nil {
             self.listNodeContainer.insertSubnode(self.rightOverlayNode, aboveSubnode: self.listNode)

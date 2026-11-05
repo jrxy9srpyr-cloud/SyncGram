@@ -15,6 +15,7 @@ import TelegramUIPreferences
 import AppBundle
 import PeerInfoPaneNode
 import ChatListUI
+import SyncGramUI
 import DeleteChatPeerActionSheetItem
 import UndoUI
 import ComponentDisplayAdapters
@@ -127,6 +128,7 @@ public final class PeerInfoChatListPaneNode: ASDisplayNode, PeerInfoPaneNode, AS
     private var presentationDataDisposable: Disposable?
     
     private let chatListNode: ChatListNode
+    private let syncGramShaderNode = SyncGramShaderNode()
     
     private var emptyShimmerEffectNode: ChatListShimmerNode?
     private var shimmerNodeOffset: CGFloat = 0.0
@@ -178,6 +180,7 @@ public final class PeerInfoChatListPaneNode: ASDisplayNode, PeerInfoPaneNode, AS
         
         self.clipsToBounds = true
         
+        self.addSubnode(self.syncGramShaderNode)
         self.addSubnode(self.chatListNode)
         
         self.view.addSubview(self.coveringView)
@@ -188,6 +191,7 @@ public final class PeerInfoChatListPaneNode: ASDisplayNode, PeerInfoPaneNode, AS
                 return
             }
             self.presentationData = presentationData
+            self.syncGramShaderNode.updateTheme(isDark: presentationData.theme.overallDarkAppearance, accent: presentationData.theme.list.itemAccentColor, base: presentationData.theme.chatList.backgroundColor)
         })
         
         self.ready.set(self.chatListNode.ready)
@@ -596,6 +600,7 @@ public final class PeerInfoChatListPaneNode: ASDisplayNode, PeerInfoPaneNode, AS
         let chatFrame = CGRect(origin: CGPoint(x: 0.0, y: -navigationHeight), size: CGSize(width: size.width, height: fullHeight))
         let combinedBottomInset = bottomInset
         
+        transition.updateFrame(node: self.syncGramShaderNode, frame: chatFrame)
         transition.updateFrame(node: self.chatListNode, frame: chatFrame)
         let (duration, curve) = listViewAnimationDurationAndCurve(transition: transition)
         self.chatListNode.updateLayout(
