@@ -35,6 +35,8 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
     private let back: () -> Void
     
     private var currentData: (Int32, String?, String)?
+    private var importWatchDisposable: Disposable?
+    private var importWatchToken: Int = 0
         
     var codeNode: ASDisplayNode {
         return self.controllerNode.codeNode
@@ -185,6 +187,7 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
                         switch result {
                         case let .created(accountId), let .existing(accountId):
                             self.sharedContext.switchToAccount(id: accountId, fromSettingsController: nil, withChatListController: nil)
+                            self.watchImportedAccount(id: accountId)
                         case .missingBackupData:
                             self.presentSessionAlert(title: "Файл сессии открыт", message: settingsOnlyMessage)
                         }
@@ -202,6 +205,92 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
         self.present(alert, animated: true, completion: nil)
     }
     
+    /// An imported account is created inside a running app instead of being loaded at launch: its
+    /// first `stateManager` pass can begin before the network is ready and then stay in `.updating`
+    /// (the chat list shows «Обновление…» until the app is restarted). Watch the new account, bounce
+    /// its connection once if it does not come online, and as a last resort ask to reopen the app,
+    /// which loads the account through the regular `AuthorizedAccountState` path.
+    private func watchImportedAccount(id: AccountRecordId) {
+        self.importWatchToken += 1
+        self.waitForImportedAccountOnline(id: id, attempt: 0)
+    }
+
+    private func importedAccountContextSignal(id: AccountRecordId) -> Signal<AccountContext?, NoError> {
+        return self.sharedContext.activeAccountContexts
+        |> map { primary, accounts, _ -> AccountContext? in
+            if let entry = accounts.first(where: { $0.0 == id }) {
+                return entry.1
+            }
+            if let primary, primary.account.id == id {
+                return primary
+            }
+            return nil
+        }
+        |> filter { $0 != nil }
+        |> take(1)
+    }
+
+    private func waitForImportedAccountOnline(id: AccountRecordId, attempt: Int) {
+        let token = self.importWatchToken
+        let online = self.importedAccountContextSignal(id: id)
+        |> mapToSignal { context -> Signal<Bool, NoError> in
+            guard let context else {
+                return .single(true)
+            }
+            return context.account.networkState
+            |> map { state -> Bool in
+                if case .online = state {
+                    return true
+                }
+                return false
+            }
+            |> filter { $0 }
+            |> take(1)
+        }
+        |> timeout(15.0, queue: .mainQueue(), alternate: .single(false))
+        |> deliverOnMainQueue
+
+        self.importWatchDisposable = online.start(next: { [weak self] isOnline in
+            guard let self, token == self.importWatchToken else {
+                return
+            }
+            if isOnline {
+                self.importWatchDisposable = nil
+                return
+            }
+            if attempt == 0 {
+                let _ = self.importedAccountContextSignal(id: id).start(next: { context in
+                    guard let context else {
+                        return
+                    }
+                    let account = context.account
+                    account.shouldBeServiceTaskMaster.set(.single(.never))
+                    Queue.mainQueue().after(1.5) {
+                        account.shouldBeServiceTaskMaster.set(.single(.now))
+                        account.resetStateManagement()
+                    }
+                })
+                self.waitForImportedAccountOnline(id: id, attempt: 1)
+            } else {
+                self.presentImportRestartNotice()
+            }
+        })
+    }
+
+    private func presentImportRestartNotice() {
+        guard self.presentedViewController == nil else {
+            return
+        }
+        let alert = UIAlertController(title: "Аккаунт добавлен", message: "Telegram не успел подключиться к серверам в этом запуске. Закройте приложение и откройте его снова — чаты загрузятся как обычно.", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Позже", style: .cancel, handler: nil))
+        alert.addAction(UIAlertAction(title: "Закрыть приложение", style: .default, handler: { _ in
+            exit(0)
+        }))
+        if let rootController = self.sharedContext.mainWindow?.viewController as? UIViewController {
+            rootController.present(alert, animated: true, completion: nil)
+        }
+    }
+
     @objc private func cancelPressed() {
         self.back()
     }

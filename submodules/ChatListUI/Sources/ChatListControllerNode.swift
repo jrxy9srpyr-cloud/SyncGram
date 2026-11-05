@@ -148,6 +148,10 @@ public final class ChatListContainerNode: ASDisplayNode, ASGestureRecognizerDele
     
     private var didSetupContentOffset = false
     private var isSettingUpContentOffset = false
+    /// Set when the user drags the list. Until then the top of the list is re-aligned when the
+    /// header height changes (folder tabs, search bar and the stories row arrive from the network
+    /// after the first data, which used to make the whole list slide down).
+    private var hasUserScrolled = false
     
     private func applyItemNodeAsCurrent(id: ChatListFilterTabEntryId, itemNode: ChatListContainerItemNode) {
         if let previousItemNode = self.currentItemNodeValue {
@@ -292,6 +296,8 @@ public final class ChatListContainerNode: ASDisplayNode, ASGestureRecognizerDele
                 return
             }
             
+            self.hasUserScrolled = true
+
             self.didBeginInteractiveDragging?(listView)
             
             if self.isInlineMode {
@@ -1052,6 +1058,7 @@ public final class ChatListContainerNode: ASDisplayNode, ASGestureRecognizerDele
     }
     
     public func update(layout: ContainerViewLayout, navigationBarHeight: CGFloat, visualNavigationHeight: CGFloat, originalNavigationHeight: CGFloat, cleanNavigationBarHeight: CGFloat, insets: UIEdgeInsets, isReorderingFilters: Bool, isEditing: Bool, inlineNavigationLocation: ChatListControllerLocation?, inlineNavigationTransitionFraction: CGFloat, storiesInset: CGFloat, transition: ContainedViewLayoutTransition) {
+        let previousNavigationBarHeight = self.validLayout?.navigationBarHeight
         self.validLayout = (layout, navigationBarHeight, visualNavigationHeight, originalNavigationHeight, cleanNavigationBarHeight, insets, isReorderingFilters, isEditing, inlineNavigationLocation, inlineNavigationTransitionFraction, storiesInset)
         
         self._validLayoutReady.set(.single(true))
@@ -1149,6 +1156,20 @@ public final class ChatListContainerNode: ASDisplayNode, ASGestureRecognizerDele
                         itemNode.removeFromSupernode()
                     }
                 }
+            }
+        }
+
+        // Folder tabs, the search bar and the stories row are measured a moment after the first
+        // data appears. When the header grows, the list keeps its content offset and the rows slide
+        // down. Until the user scrolls, keep the top aligned with the new header height.
+        if let previousNavigationBarHeight = previousNavigationBarHeight, self.didSetupContentOffset, !self.hasUserScrolled, abs(previousNavigationBarHeight - navigationBarHeight) > 0.5 {
+            if let itemNode = self.currentItemNodeValue, case let .known(value) = itemNode.listNode.visibleContentOffset(), abs(value) < 1.0 {
+                self.isSettingUpContentOffset = true
+                let _ = itemNode.listNode.scrollToOffsetFromTop(ChatListNavigationBar.searchScrollHeight + storiesInset, animated: false)
+                let offset = itemNode.listNode.visibleContentOffset()
+                self.contentOffset = offset
+                self.contentOffsetChanged?(offset, itemNode.listNode)
+                self.isSettingUpContentOffset = false
             }
         }
     }
