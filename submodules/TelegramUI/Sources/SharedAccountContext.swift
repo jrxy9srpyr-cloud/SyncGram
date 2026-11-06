@@ -194,6 +194,9 @@ public final class SharedAccountContextImpl: SharedAccountContext {
         return self.activeAccountsPromise.get()
     }
     private let managedAccountDisposables = DisposableDict<AccountRecordId>()
+    /// Imported accounts start their first sync only after the network is online, so the initial
+    /// `updates.getState` is not issued while the account is still not allowed to connect.
+    private let deferredStateStartDisposables = DisposableDict<AccountRecordId>()
     private let activeAccountsWithInfoPromise = Promise<(primary: AccountRecordId?, accounts: [AccountWithInfo])>()
     public var activeAccountsWithInfo: Signal<(primary: AccountRecordId?, accounts: [AccountWithInfo]), NoError> {
         return self.activeAccountsWithInfoPromise.get()
@@ -756,6 +759,7 @@ public final class SharedAccountContextImpl: SharedAccountContext {
                             if let index = self.activeAccountsValue?.accounts.firstIndex(where: { $0.0 == account.id }) {
                                 self.activeAccountsValue?.accounts.remove(at: index)
                                 self.managedAccountDisposables.set(nil, forKey: account.id)
+                                self.deferredStateStartDisposables.set(nil, forKey: account.id)
                                 assertionFailure()
                             }
 
@@ -764,7 +768,30 @@ public final class SharedAccountContextImpl: SharedAccountContext {
                             self.activeAccountsValue!.accounts.append((account.id, context, accountRecord.2))
                             
                             self.managedAccountDisposables.set(self.updateAccountBackupData(account: account).start(), forKey: account.id)
-                            account.resetStateManagement()
+                            if records[accountRecord.0]?.backupData != nil {
+                                // A session was just imported. Start its first sync only once the
+                                // network is actually connected: otherwise the initial
+                                // `updates.getState` can be issued on a connection that is not
+                                // allowed yet and the chat list stays on «Обновление…» until the
+                                // app is restarted.
+                                let disposable = (account.network.connectionStatus
+                                |> filter { status -> Bool in
+                                    if case .online = status {
+                                        return true
+                                    }
+                                    return false
+                                }
+                                |> take(1)
+                                |> timeout(20.0, queue: .mainQueue(), alternate: .single(ConnectionStatus.waitingForNetwork))
+                                |> deliverOnMainQueue
+                                |> map { _ -> Void in
+                                    Logger.shared.log("SharedAccountContext", "starting state management for imported account \(account.id.int64)")
+                                    account.resetStateManagement()
+                                }).start()
+                                self.deferredStateStartDisposables.set(disposable, forKey: account.id)
+                            } else {
+                                account.resetStateManagement()
+                            }
                             hadUpdates = true
                         }
                     } else {
@@ -787,6 +814,7 @@ public final class SharedAccountContextImpl: SharedAccountContext {
                         self.activeAccountsValue?.accounts.remove(at: index)
                         self.managedAccountDisposables.set(nil, forKey: id)
                     }
+                    self.deferredStateStartDisposables.set(nil, forKey: id)
                 }
                 var primary: AccountContext?
                 if let primaryId = primaryId {

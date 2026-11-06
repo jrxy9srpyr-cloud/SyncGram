@@ -426,9 +426,9 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
             guard let context else {
                 return .single(true)
             }
-            return context.account.networkState
-            |> map { state -> Bool in
-                if case .online = state {
+            return context.account.network.connectionStatus
+            |> map { status -> Bool in
+                if case .online = status {
                     return true
                 }
                 return false
@@ -444,10 +444,12 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
                 return
             }
             if isOnline {
+                Logger.shared.log("SyncGram", "imported account \(id.int64) is online")
                 self.importWatchDisposable = nil
                 return
             }
             if attempt == 0 {
+                Logger.shared.log("SyncGram", "imported account \(id.int64) did not come online, bouncing the connection")
                 let _ = self.importedAccountContextSignal(id: id).start(next: { context in
                     guard let context else {
                         return
@@ -461,6 +463,7 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
                 })
                 self.waitForImportedAccountOnline(id: id, attempt: 1)
             } else {
+                Logger.shared.log("SyncGram", "imported account \(id.int64) is still not online, asking for a restart")
                 self.presentImportRestartNotice()
             }
         })
