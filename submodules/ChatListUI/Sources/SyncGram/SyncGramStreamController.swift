@@ -879,7 +879,7 @@ public final class SyncGramStreamController: ViewController {
 
         self.emptyLabel.frame = CGRect(x: 32.0, y: scrollTop + 80.0, width: bounds.width - 64.0, height: 80.0)
         self.skeletonView.frame = self.scrollView.frame
-        self.skeletonView.update(isDark: self.theme.overallDarkAppearance)
+        self.skeletonView.update(isDark: self.presentationData.theme.overallDarkAppearance)
 
         self.layoutEntries()
     }
