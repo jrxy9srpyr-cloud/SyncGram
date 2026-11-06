@@ -62,7 +62,7 @@ private func resolveAccessChallenge(_ current: PostboxAccessChallengeData?, allo
 }
 
 @available(macOS 10.15, *)
-public func setupAccountManager<Types: AccountManagerTypes>(basePath: String, isTemporary: Bool, isReadOnly: Bool, useCaches: Bool, removeDatabaseOnError: Bool, resetLocalSecrets: (() throws -> Void)? = nil) -> AccountManager<Types> {
+public func setupAccountManager<Types: AccountManagerTypes>(basePath: String, isTemporary: Bool, isReadOnly: Bool, useCaches: Bool, removeDatabaseOnError: Bool, encryptionParameters: EngineValueBoxEncryptionParameters? = nil, resetLocalSecrets: (() throws -> Void)? = nil) -> AccountManager<Types> {
     let isMainProcess = PasscodeEnvironment.shared.isMainApp
     let canReset = isMainProcess && !isTemporary && !isReadOnly
     precondition(!canReset || resetLocalSecrets != nil)
@@ -89,6 +89,7 @@ public func setupAccountManager<Types: AccountManagerTypes>(basePath: String, is
                     try PasscodeCredentialStore.shared.resumeCleanup()
                 }
             }
-        )
+        ),
+        encryptionParameters: encryptionParameters
     )
 }
