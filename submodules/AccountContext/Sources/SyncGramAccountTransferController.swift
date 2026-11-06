@@ -6,7 +6,6 @@ import UIKit
 /// empty chat list with a bare «Обновление…».
 public final class SyncGramAccountTransferController: UIViewController {
     private let card = UIView()
-    private let iconView = UIView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let stepsStack = UIStackView()
@@ -34,12 +33,6 @@ public final class SyncGramAccountTransferController: UIViewController {
         self.card.layer.cornerRadius = 20.0
         self.card.translatesAutoresizingMaskIntoConstraints = false
         self.view.addSubview(self.card)
-
-        self.iconView.backgroundColor = .systemBlue
-        self.iconView.layer.cornerRadius = 24.0
-        self.iconView.translatesAutoresizingMaskIntoConstraints = false
-        self.iconView.isHidden = true
-        self.card.addSubview(self.iconView)
 
         self.titleLabel.text = "Перенос аккаунта"
         self.titleLabel.font = .systemFont(ofSize: 20.0, weight: .semibold)
@@ -104,12 +97,15 @@ public final class SyncGramAccountTransferController: UIViewController {
         self.doneButton.isHidden = true
         self.card.addSubview(self.doneButton)
 
+        let cardWidth = self.card.widthAnchor.constraint(equalToConstant: 340.0)
+        cardWidth.priority = .defaultHigh
+
         NSLayoutConstraint.activate([
             self.card.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
             self.card.centerYAnchor.constraint(equalTo: self.view.centerYAnchor),
             self.card.leadingAnchor.constraint(greaterThanOrEqualTo: self.view.leadingAnchor, constant: 24.0),
             self.card.trailingAnchor.constraint(lessThanOrEqualTo: self.view.trailingAnchor, constant: -24.0),
-            self.card.widthAnchor.constraint(lessThanOrEqualToConstant: 360.0),
+            cardWidth,
 
             self.titleLabel.topAnchor.constraint(equalTo: self.card.topAnchor, constant: 24.0),
             self.titleLabel.leadingAnchor.constraint(equalTo: self.card.leadingAnchor, constant: 24.0),
