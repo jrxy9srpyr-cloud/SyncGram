@@ -16,6 +16,7 @@ import ComponentDisplayAdapters
 import SwiftSignalKit
 import ChatListHeaderComponent
 import ButtonComponent
+import SyncGramUI
 
 final class ChatListEmptyNode: ASDisplayNode {
     enum Subject {
@@ -43,6 +44,7 @@ final class ChatListEmptyNode: ASDisplayNode {
     private let buttonIsShimmering: Bool
     private let secondaryButtonNode: HighlightableButtonNode
     private let activityIndicator: ActivityIndicator
+    private let skeletonView = SyncGramSkeletonView(style: SyncGramSkeletonView.Style(rows: 7, rowHeight: 72.0, avatarSize: 46.0))
     
     private var emptyArchive: ComponentView<Empty>?
     
@@ -125,6 +127,10 @@ final class ChatListEmptyNode: ASDisplayNode {
         self.textNode.isHidden = self.isLoading
         self.descriptionNode.isHidden = self.isLoading
         self.activityIndicator.isHidden = !self.isLoading
+
+        self.view.addSubview(self.skeletonView)
+        self.skeletonView.isHidden = !self.isLoading
+        self.skeletonView.setAnimating(self.isLoading)
         
         self.secondaryButtonNode.addTarget(self, action: #selector(self.secondaryButtonPressed), forControlEvents: .touchUpInside)
         
@@ -227,10 +233,14 @@ final class ChatListEmptyNode: ASDisplayNode {
         self.descriptionNode.isHidden = self.isLoading
         self.button.view?.isHidden = self.buttonText == nil || self.buttonIsHidden || self.isLoading
         self.activityIndicator.isHidden = !self.isLoading
+        self.skeletonView.isHidden = !self.isLoading
+        self.skeletonView.setAnimating(self.isLoading)
     }
     
     func updateLayout(size: CGSize, insets: UIEdgeInsets, transition: ContainedViewLayoutTransition) {
         self.validLayout = (size, insets)
+        self.skeletonView.frame = CGRect(x: 0.0, y: insets.top, width: size.width, height: max(0.0, size.height - insets.top - insets.bottom))
+        self.skeletonView.update(isDark: self.theme.overallDarkAppearance)
         // Centred in the band between the side insets when they differ (iPhone Duo's side strip); equal insets keep the
         // full width.
         let bandMinX: CGFloat = insets.left != insets.right ? insets.left : 0.0

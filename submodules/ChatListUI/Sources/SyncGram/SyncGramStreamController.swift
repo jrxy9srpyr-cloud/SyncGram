@@ -516,6 +516,7 @@ public final class SyncGramStreamController: ViewController {
     private let scrollView = UIScrollView()
     private let composerButton = UIButton(type: .system)
     private let emptyLabel = UILabel()
+    private let skeletonView = SyncGramSkeletonView(style: SyncGramSkeletonView.Style(rows: 6, rowHeight: 84.0, avatarSize: 34.0, horizontalInset: 16.0, topInset: 6.0, barHeight: 12.0, barSpacing: 8.0))
 
     private let disposable = MetaDisposable()
     private let revision = ValuePromise<Int>(0, ignoreRepeated: false)
@@ -610,6 +611,10 @@ public final class SyncGramStreamController: ViewController {
         self.emptyLabel.textAlignment = .center
         self.emptyLabel.isHidden = true
         self.view.addSubview(self.emptyLabel)
+        self.view.addSubview(self.skeletonView)
+        self.skeletonView.update(isDark: theme.overallDarkAppearance)
+        self.skeletonView.setAnimating(true)
+        self.skeletonView.isHidden = !SyncGramStreamSettings.shared.hasSelection
 
         // Refresh as soon as chats are selected or deselected in the picker, so coming back to the
         // stream does not require reopening it several times.
@@ -632,42 +637,97 @@ public final class SyncGramStreamController: ViewController {
                 let listSignal = accountContext.account.viewTracker.tailChatListView(groupId: .root, count: 100)
                 let archiveSignal = accountContext.account.viewTracker.tailChatListView(groupId: Namespaces.PeerGroup.archive, count: 100)
                 return combineLatest(queue: .mainQueue(), peerSignal, listSignal, archiveSignal)
-                |> map { peer, view, archiveView -> [SyncGramStreamItem] in
+                |> mapToSignal { peer, view, archiveView -> Signal<[SyncGramStreamItem], NoError> in
                     let data = accountContext.sharedContext.currentPresentationData.with { $0 }
                     let accountTitle = peer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? "Аккаунт"
-                    var result: [SyncGramStreamItem] = []
+                    let selectedIds = Set(SyncGramStreamSettings.shared.selectedPeerIds(accountId: accountId))
+                    let hasSelection = !selectedIds.isEmpty
+
+                    struct StreamChat {
+                        let peerId: EnginePeer.Id
+                        let title: String
+                        let peer: EnginePeer?
+                    }
+                    var chats: [StreamChat] = []
+                    var seen = Set<EnginePeer.Id>()
                     for entry in view.0.entries + archiveView.0.entries {
-                        guard case let .MessageEntry(entryData) = entry, let message = entryData.messages.first else { continue }
+                        guard case let .MessageEntry(entryData) = entry else { continue }
+                        let peerId = entryData.renderedPeer.peerId
+                        if hasSelection && !selectedIds.contains(peerId) {
+                            continue
+                        }
+                        // A locked chat must not leak its messages into the aggregate feed.
+                        if SyncGramChatLock.shared.isLocked(peerId) {
+                            continue
+                        }
+                        if !seen.insert(peerId).inserted {
+                            continue
+                        }
                         let chatPeer = entryData.renderedPeer.peer.flatMap { EnginePeer($0) }
                         let chatTitle = chatPeer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? "Чат"
-                        let authorPeer = message.author.flatMap { EnginePeer($0) } ?? chatPeer
-                        let authorName = authorPeer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? chatTitle
-                        var mediaText = syncGramStreamMediaText(message)
-                        if mediaText.isEmpty && message.text.isEmpty {
-                            mediaText = "[сообщение]"
-                        }
-                        let textEntities = message.attributes.compactMap({ $0 as? TextEntitiesMessageAttribute }).first?.entities ?? []
-                        result.append(SyncGramStreamItem(
-                            accountId: accountId,
-                            accountContext: accountContext,
-                            accountTitle: accountTitle,
-                            chatTitle: chatTitle,
-                            authorName: authorName,
-                            authorPeer: authorPeer,
-                            mediaText: mediaText,
-                            plainText: message.text,
-                            textEntities: textEntities,
-                            message: message,
-                            media: message.media.first,
-                            timestamp: message.timestamp,
-                            peerId: message.id.peerId,
-                            messageId: message.id,
-                            threadId: message.threadId,
-                            isOutgoing: !message.flags.contains(.Incoming),
-                            isDeleted: message.isSyncGramDeleted
-                        ))
+                        chats.append(StreamChat(peerId: peerId, title: chatTitle, peer: chatPeer))
                     }
-                    return result
+
+                    // Load the actual history of every selected chat instead of only the last
+                    // message of each chat: the stream is a feed, not a "last messages" digest.
+                    let historySignals: [Signal<[SyncGramStreamItem], NoError>] = chats.map { chat in
+                        return accountContext.account.viewTracker.aroundMessageHistoryViewForLocation(
+                            .peer(peerId: chat.peerId, threadId: nil),
+                            index: .upperBound,
+                            anchorIndex: .upperBound,
+                            count: 40,
+                            fixedCombinedReadStates: nil
+                        )
+                        |> map { historyView, _, _ -> [SyncGramStreamItem] in
+                            var result: [SyncGramStreamItem] = []
+                            for message in historyView.entries.map({ $0.message }) {
+                                if message.id.namespace != Namespaces.Message.Cloud {
+                                    continue
+                                }
+                                let authorPeer = message.author.flatMap { EnginePeer($0) } ?? chat.peer
+                                let authorName = authorPeer?.displayTitle(strings: data.strings, displayOrder: data.nameDisplayOrder) ?? chat.title
+                                var mediaText = syncGramStreamMediaText(message)
+                                if mediaText.isEmpty && message.text.isEmpty {
+                                    mediaText = "[сообщение]"
+                                }
+                                let textEntities = message.attributes.compactMap({ $0 as? TextEntitiesMessageAttribute }).first?.entities ?? []
+                                result.append(SyncGramStreamItem(
+                                    accountId: accountId,
+                                    accountContext: accountContext,
+                                    accountTitle: accountTitle,
+                                    chatTitle: chat.title,
+                                    authorName: authorName,
+                                    authorPeer: authorPeer,
+                                    mediaText: mediaText,
+                                    plainText: message.text,
+                                    textEntities: textEntities,
+                                    message: message,
+                                    media: message.media.first,
+                                    timestamp: message.timestamp,
+                                    peerId: message.id.peerId,
+                                    messageId: message.id,
+                                    threadId: message.threadId,
+                                    isOutgoing: !message.flags.contains(.Incoming),
+                                    isDeleted: message.isSyncGramDeleted
+                                ))
+                            }
+                            return result
+                        }
+                    }
+                    if historySignals.isEmpty {
+                        return .single([] as [SyncGramStreamItem])
+                    }
+                    return combineLatest(queue: .mainQueue(), historySignals)
+                    |> map { lists -> [SyncGramStreamItem] in
+                        var seenMessageIds = Set<EngineMessage.Id>()
+                        var merged: [SyncGramStreamItem] = []
+                        for item in lists.flatMap({ $0 }) {
+                            if seenMessageIds.insert(item.messageId).inserted {
+                                merged.append(item)
+                            }
+                        }
+                        return Array(merged.sorted(by: { $0.timestamp < $1.timestamp }).suffix(400))
+                    }
                 }
             }
             return combineLatest(queue: .mainQueue(), signals)
@@ -690,6 +750,8 @@ public final class SyncGramStreamController: ViewController {
     }
 
     private func update(_ items: [SyncGramStreamItem]) {
+        self.skeletonView.isHidden = true
+        self.skeletonView.setAnimating(false)
         // Keep the reader's position when the feed refreshes.
         if self.hasPerformedInitialScroll {
             self.pendingScrollOffset = self.scrollView.contentOffset
@@ -816,6 +878,8 @@ public final class SyncGramStreamController: ViewController {
         self.scrollView.frame = CGRect(x: 0.0, y: scrollTop, width: bounds.width, height: max(0.0, scrollBottom - scrollTop))
 
         self.emptyLabel.frame = CGRect(x: 32.0, y: scrollTop + 80.0, width: bounds.width - 64.0, height: 80.0)
+        self.skeletonView.frame = self.scrollView.frame
+        self.skeletonView.update(isDark: self.theme.overallDarkAppearance)
 
         self.layoutEntries()
     }

@@ -8285,6 +8285,11 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     override public func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
 
+        // A locked chat is unlocked for one visit only: leaving it locks the chat again.
+        if let peerId = self.chatLocation.peerId, SyncGramChatLock.shared.isLocked(peerId) {
+            SyncGramChatLock.shared.lockAgain(peerId)
+        }
+
         self.walletTransferAnimationsVisible = false
         
         if #available(iOS 18.0, *) {

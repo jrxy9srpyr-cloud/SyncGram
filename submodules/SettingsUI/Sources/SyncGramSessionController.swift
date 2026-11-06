@@ -32,6 +32,9 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
     private let noteLabel: UILabel
 
     private var exportFileURL: URL?
+    private var transferCoordinator: SyncGramImportedAccountCoordinator?
+    private var lastImportData: Data?
+    private var lastImportQuestion: String?
     private var isExportingPicker = false
 
     public init(context: AccountContext) {
@@ -71,7 +74,7 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
         self.titleLabel.textColor = theme.list.itemPrimaryTextColor
         self.scrollView.addSubview(self.titleLabel)
 
-        self.descriptionLabel.text = "Сохраняет полную сессию аккаунта — включая ключи Telegram — и настройки SyncGram в зашифрованный файл. При импорте аккаунт входит автоматически, без кода из Telegram."
+        self.descriptionLabel.text = "Файл — запасной ключ от вашего аккаунта. Кто получит файл и ответ на контрольный вопрос, сможет войти в аккаунт без кода из Telegram, поэтому никому не отправляйте файл. Переписки хранятся на серверах Telegram и не пропадут. После переноса файл лучше удалить."
         self.descriptionLabel.font = Font.regular(14.0)
         self.descriptionLabel.textColor = theme.list.itemSecondaryTextColor
         self.descriptionLabel.numberOfLines = 0
@@ -119,7 +122,7 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
         self.statusLabel.numberOfLines = 0
         self.scrollView.addSubview(self.statusLabel)
 
-        self.noteLabel.text = "Шифрование: AES-256-GCM, ключ выводится из ответа через PBKDF2-HMAC-SHA256 (600 000 итераций). Сам ответ нигде не сохраняется, поэтому без него файл не расшифровать."
+        self.noteLabel.text = "Файл зашифрован: AES-256-GCM, ключ выводится из ответа через PBKDF2-HMAC-SHA256 (600 000 итераций). Ответ нигде не сохраняется — без него файл не расшифровать. Короткий ответ можно подобрать офлайн, поэтому используйте фразу не короче 8 символов."
         self.noteLabel.font = Font.regular(12.0)
         self.noteLabel.textColor = theme.list.itemSecondaryTextColor
         self.noteLabel.numberOfLines = 0
@@ -347,9 +350,11 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
         do {
             question = try SyncGramSessionArchive.question(in: data)
         } catch {
-            self.presentError("Это не файл сессии SyncGram.")
+            self.presentImportError("Это не файл сессии SyncGram. Выберите файл с расширением .syncgram.")
             return
         }
+        self.lastImportData = data
+        self.lastImportQuestion = question
         self.askAnswer(question: question, data: data)
     }
 
@@ -389,7 +394,7 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
                     self.apply(snapshot: snapshot, question: question)
                 case let .failure(error):
                     self.statusLabel.text = nil
-                    self.presentError(self.message(for: error))
+                    self.presentImportError(self.message(for: error))
                 }
             }
         }
@@ -400,10 +405,6 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
         NotificationCenter.default.post(name: SyncGramNotificationNames.settingsChanged, object: nil)
         NotificationCenter.default.post(name: SyncGramNotificationNames.chatListScaleChanged, object: nil)
 
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        let created = formatter.string(from: Date(timeIntervalSince1970: snapshot.createdAt))
         let username = snapshot.username.map { "@\($0)" } ?? "—"
 
         self.answerField.text = nil
@@ -417,24 +418,29 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
             return
         }
 
-        let _ = (syncGramImportSession(snapshot: snapshot, accountManager: self.context.sharedContext.accountManager)
-        |> deliverOnMainQueue).start(next: { [weak self] result in
-            guard let self else {
-                return
-            }
-            switch result {
-            case let .created(accountId), let .existing(accountId):
-                self.statusLabel.text = "Импортировано: \(snapshot.accountTitle) (\(username)). Входим в аккаунт по сохранённой сессии…"
+        let transfer = SyncGramAccountTransferController()
+        transfer.onClose = { [weak self] in
+            self?.setBusy(false)
+            self?.statusLabel.text = "Готово."
+        }
+        self.present(transfer, animated: true, completion: nil)
+
+        let coordinator = SyncGramImportedAccountCoordinator()
+        self.transferCoordinator = coordinator
+        coordinator.start(snapshot: snapshot, sharedContext: self.context.sharedContext, progress: { [weak self, weak transfer] step in
+            transfer?.update(step: step)
+            switch step {
+            case .creatingAccount, .connecting:
+                self?.statusLabel.text = "Переносим аккаунт…"
+            case .ready:
+                self?.statusLabel.text = "Аккаунт подключён."
                 SyncGramToast.show("Сессия «\(snapshot.accountTitle)» импортирована")
-                self.context.sharedContext.markAccountAsImported(accountId)
-                self.context.sharedContext.switchToAccount(id: accountId, fromSettingsController: nil, withChatListController: nil)
-            case .invalidBackupData:
-                self.setBusy(false)
-                self.statusLabel.text = "Файл сессии повреждён."
-                SyncGramToast.show("Ключи сессии в файле повреждены")
-            case .missingBackupData:
-                self.statusLabel.text = "Импортировано: \(snapshot.accountTitle) (\(username)). Файл создан \(created). В файле нет ключей сессии — восстановлены только настройки SyncGram, войдите по коду из Telegram."
-                SyncGramToast.show("Настройки SyncGram импортированы")
+            case .settingsOnly:
+                self?.statusLabel.text = "Восстановлены только настройки SyncGram."
+            case .invalidFile:
+                self?.statusLabel.text = "Файл сессии повреждён."
+            case .failed:
+                break
             }
         })
     }
@@ -470,6 +476,21 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
     private func presentError(_ text: String) {
         let alert = UIAlertController(title: "Ошибка", message: text, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+        self.present(alert, animated: true, completion: nil)
+    }
+
+    /// Import errors always offer the next action instead of a dead-end "OK".
+    private func presentImportError(_ text: String) {
+        let alert = UIAlertController(title: "Не удалось открыть файл", message: text, preferredStyle: .alert)
+        if let data = self.lastImportData, let question = self.lastImportQuestion {
+            alert.addAction(UIAlertAction(title: "Ввести ответ ещё раз", style: .default, handler: { [weak self] _ in
+                self?.askAnswer(question: question, data: data)
+            }))
+        }
+        alert.addAction(UIAlertAction(title: "Выбрать другой файл", style: .default, handler: { [weak self] _ in
+            self?.importTapped()
+        }))
+        alert.addAction(UIAlertAction(title: "Отмена", style: .cancel, handler: nil))
         self.present(alert, animated: true, completion: nil)
     }
 }

@@ -2600,6 +2600,16 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                         messageText = psaText
                         richTextPreview = nil
                     }
+
+                    // A locked chat keeps the contact name but never leaks the message preview.
+                    if SyncGramChatLock.shared.isLocked(itemPeer.peerId) {
+                        initialHideAuthor = true
+                        messageText = "🔒 Заблокированный чат"
+                        messageEntities = []
+                        spoilers = []
+                        customEmojiRanges = []
+                        richTextPreview = nil
+                    }
                 
                     switch itemPeer.peer {
                     case .user:

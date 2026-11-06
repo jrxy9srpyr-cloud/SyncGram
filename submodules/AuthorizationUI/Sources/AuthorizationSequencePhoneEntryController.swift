@@ -35,6 +35,7 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
     private let back: () -> Void
     
     private var currentData: (Int32, String?, String)?
+    private var transferCoordinator: SyncGramImportedAccountCoordinator?
         
     var codeNode: ASDisplayNode {
         return self.controllerNode.codeNode
@@ -176,9 +177,6 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
                 }
                 switch result {
                 case let .success((_, snapshot)):
-                    SyncGramSettings.applySessionSnapshot(snapshot.settings)
-                    NotificationCenter.default.post(name: SyncGramNotificationNames.settingsChanged, object: nil)
-                    NotificationCenter.default.post(name: SyncGramNotificationNames.chatListScaleChanged, object: nil)
                     var lines: [String] = ["Аккаунт: \(snapshot.accountTitle)"]
                     if let username = snapshot.username {
                         lines.append("Username: @\(username)")
@@ -186,22 +184,26 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
                     if let phone = snapshot.phone, !phone.isEmpty {
                         lines.append("Номер: +\(phone)")
                     }
-                    let settingsOnlyMessage = lines.joined(separator: "\n") + "\nВ файле нет ключей сессии — восстановлены только настройки. Войдите по коду из Telegram."
-                    let _ = (syncGramImportSession(snapshot: snapshot, accountManager: self.sharedContext.accountManager)
-                    |> deliverOnMainQueue).start(next: { [weak self] result in
+                    lines.append("Сейчас добавится второй аккаунт, текущий останется на месте. Переписки хранятся на серверах Telegram и не пропадут.")
+                    let confirm = UIAlertController(title: "Перенести аккаунт?", message: lines.joined(separator: "\n"), preferredStyle: .alert)
+                    confirm.addAction(UIAlertAction(title: "Отмена", style: .cancel, handler: nil))
+                    confirm.addAction(UIAlertAction(title: "Продолжить", style: .default, handler: { [weak self] _ in
                         guard let self else {
                             return
                         }
-                        switch result {
-                        case let .created(accountId), let .existing(accountId):
-                            self.sharedContext.markAccountAsImported(accountId)
-                            self.sharedContext.switchToAccount(id: accountId, fromSettingsController: nil, withChatListController: nil)
-                        case .invalidBackupData:
-                            self.presentSessionAlert(title: "Файл повреждён", message: "Ключи сессии в файле повреждены. Выберите другой файл или войдите по коду из Telegram.")
-                        case .missingBackupData:
-                            self.presentSessionAlert(title: "Файл сессии открыт", message: settingsOnlyMessage)
-                        }
-                    })
+                        SyncGramSettings.applySessionSnapshot(snapshot.settings)
+                        NotificationCenter.default.post(name: SyncGramNotificationNames.settingsChanged, object: nil)
+                        NotificationCenter.default.post(name: SyncGramNotificationNames.chatListScaleChanged, object: nil)
+
+                        let transfer = SyncGramAccountTransferController()
+                        self.present(transfer, animated: true, completion: nil)
+                        let coordinator = SyncGramImportedAccountCoordinator()
+                        self.transferCoordinator = coordinator
+                        coordinator.start(snapshot: snapshot, sharedContext: self.sharedContext, progress: { [weak transfer] step in
+                            transfer?.update(step: step)
+                        })
+                    }))
+                    self.present(confirm, animated: true, completion: nil)
                 case .failure:
                     self.presentSessionAlert(title: "Ошибка", message: "Ответ не подошёл или файл повреждён. Проверьте ответ — регистр букв не важен — и попробуйте ещё раз.")
                 }

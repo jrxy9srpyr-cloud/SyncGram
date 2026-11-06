@@ -264,7 +264,7 @@ public class ShareRootControllerImpl {
             }, forceOrientation: { _ in
             })
             
-            let accountManager: AccountManager<TelegramAccountManagerTypes> = setupAccountManager(basePath: rootPath + "/accounts-metadata", isTemporary: true, isReadOnly: false, useCaches: false, removeDatabaseOnError: false)
+            let accountManager: AccountManager<TelegramAccountManagerTypes> = setupAccountManager(basePath: rootPath + "/accounts-metadata", isTemporary: true, isReadOnly: false, useCaches: false, removeDatabaseOnError: false, encryptionParameters: EngineValueBoxEncryptionParameters(forceEncryptionIfNoSet: false, key: EngineValueBoxEncryptionParameters.Key(data: self.initializationData.encryptionParameters.0)!, salt: EngineValueBoxEncryptionParameters.Salt(data: self.initializationData.encryptionParameters.1)!))
             initializeAccountManagement()
             
             do {

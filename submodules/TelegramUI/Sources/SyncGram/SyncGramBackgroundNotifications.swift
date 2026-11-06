@@ -76,6 +76,10 @@ public enum SyncGramBackgroundNotifications {
             guard case let .MessageEntry(entryData) = entry else {
                 continue
             }
+            // A locked chat must not contribute to the unread badge or the notification body.
+            if SyncGramChatLock.shared.isLocked(entryData.renderedPeer.peerId) {
+                continue
+            }
             guard let readState = entryData.readState, !readState.isMuted else {
                 continue
             }

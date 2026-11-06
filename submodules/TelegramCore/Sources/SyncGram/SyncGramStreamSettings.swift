@@ -46,6 +46,21 @@ public final class SyncGramStreamSettings {
         return !(self.defaults.stringArray(forKey: self.key) ?? []).isEmpty
     }
 
+    /// Peer ids selected for the stream on the given account. The token is `accountId:peerId`.
+    public func selectedPeerIds(accountId: AccountRecordId) -> [EnginePeer.Id] {
+        let prefix = "\(accountId.int64):"
+        let values = self.defaults.stringArray(forKey: self.key) ?? []
+        return values.compactMap { value -> EnginePeer.Id? in
+            guard value.hasPrefix(prefix) else {
+                return nil
+            }
+            guard let raw = Int64(value.dropFirst(prefix.count)) else {
+                return nil
+            }
+            return EnginePeer.Id(raw)
+        }
+    }
+
     public func clear() {
         self.defaults.removeObject(forKey: self.key)
         self.notifySelectionChanged()

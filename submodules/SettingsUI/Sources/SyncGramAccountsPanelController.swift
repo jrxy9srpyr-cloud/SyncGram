@@ -148,6 +148,8 @@ public final class SyncGramAccountsPanelController: ViewController {
     private let disposable = MetaDisposable()
     private var latestById: [Int64: (EnginePeer.Id, EngineMessage.Id?)] = [:]
     private var usernameById: [Int64: String] = [:]
+    private var hasLoaded = false
+    private let skeletonView = SyncGramSkeletonView(style: SyncGramSkeletonView.Style(rows: 4, rowHeight: 96.0, avatarSize: 40.0, horizontalInset: 4.0, topInset: 4.0, barHeight: 12.0, barSpacing: 8.0))
 
     public init(context: AccountContext) {
         self.context = context
@@ -190,6 +192,9 @@ public final class SyncGramAccountsPanelController: ViewController {
 
         self.scrollView.alwaysBounceVertical = true
         self.view.addSubview(self.scrollView)
+        self.view.addSubview(self.skeletonView)
+        self.skeletonView.update(isDark: theme.overallDarkAppearance)
+        self.skeletonView.setAnimating(true)
         self.stackView.axis = .vertical
         self.stackView.spacing = 10.0
         self.scrollView.addSubview(self.stackView)
@@ -282,6 +287,9 @@ public final class SyncGramAccountsPanelController: ViewController {
 
     private func updateItems(_ items: [SyncGramAccountPanelItem]) {
         self.currentItems = items
+        self.hasLoaded = true
+        self.skeletonView.isHidden = true
+        self.skeletonView.setAnimating(false)
 
         self.latestById = [:]
         for item in items {
@@ -481,6 +489,8 @@ public final class SyncGramAccountsPanelController: ViewController {
 
         let scrollTop = top + 34.0 + subtitleHeight + 14.0
         self.scrollView.frame = CGRect(x: 20.0, y: scrollTop, width: width, height: bounds.height - scrollTop - insets.bottom - 16.0)
+        self.skeletonView.frame = self.scrollView.frame
+        self.skeletonView.isHidden = self.hasLoaded
         let height = self.stackView.systemLayoutSizeFitting(CGSize(width: width, height: .greatestFiniteMagnitude)).height
         self.stackView.frame = CGRect(x: 0.0, y: 0.0, width: width, height: height)
         self.scrollView.contentSize = CGSize(width: width, height: height)

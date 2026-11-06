@@ -108,7 +108,7 @@ final class AccountManagerImpl<Types: AccountManagerTypes> {
         }
     }
     
-    fileprivate init?(queue: Queue, basePath: String, isTemporary: Bool, isReadOnly: Bool, useCaches: Bool, removeDatabaseOnError: Bool, temporarySessionId: Int64, accessChallenge: AccountManagerAccessChallenge) {
+    fileprivate init?(queue: Queue, basePath: String, isTemporary: Bool, isReadOnly: Bool, useCaches: Bool, removeDatabaseOnError: Bool, temporarySessionId: Int64, accessChallenge: AccountManagerAccessChallenge, encryptionParameters: ValueBoxEncryptionParameters?) {
         let startTime = CFAbsoluteTimeGetCurrent()
         
         self.queue = queue
@@ -119,7 +119,27 @@ final class AccountManagerImpl<Types: AccountManagerTypes> {
         self.canCleanPasscodeMetadata = !isReadOnly && !isTemporary
         self.resolveAccessChallenge = accessChallenge.resolve
         let _ = try? FileManager.default.createDirectory(atPath: basePath, withIntermediateDirectories: true, attributes: nil)
-        guard let guardValueBox = SqliteValueBox(basePath: basePath + "/guard_db", queue: queue, isTemporary: isTemporary, isReadOnly: false, useCaches: useCaches, removeDatabaseOnError: removeDatabaseOnError, encryptionParameters: nil, upgradeProgress: { _ in }) else {
+
+        // The account metadata database may hold sensitive account attributes. Encrypt fresh
+        // installations with the same device-specific key as the postbox. Existing installations
+        // keep their plaintext database (there is no safe in-place migration yet) so an upgrade
+        // can never delete the user's accounts; a marker file records which databases are
+        // encrypted.
+        let encryptionMarkerPath = basePath + "/db/encrypted"
+        let databasePath = basePath + "/db/db_sqlite"
+        let databaseExists = FileManager.default.fileExists(atPath: databasePath)
+        var effectiveEncryptionParameters: ValueBoxEncryptionParameters?
+        if let encryptionParameters = encryptionParameters {
+            if !databaseExists {
+                try? FileManager.default.createDirectory(atPath: basePath + "/db", withIntermediateDirectories: true)
+                try? Data().write(to: URL(fileURLWithPath: encryptionMarkerPath))
+                effectiveEncryptionParameters = encryptionParameters
+            } else if FileManager.default.fileExists(atPath: encryptionMarkerPath) {
+                effectiveEncryptionParameters = encryptionParameters
+            }
+        }
+
+        guard let guardValueBox = SqliteValueBox(basePath: basePath + "/guard_db", queue: queue, isTemporary: isTemporary, isReadOnly: false, useCaches: useCaches, removeDatabaseOnError: removeDatabaseOnError, encryptionParameters: effectiveEncryptionParameters, upgradeProgress: { _ in }) else {
             postboxLog("Could not open guard value box at \(basePath + "/guard_db")")
             postboxLogSync()
             preconditionFailure()
@@ -129,7 +149,7 @@ final class AccountManagerImpl<Types: AccountManagerTypes> {
         
         var valueBox: SqliteValueBox?
         for i in 0 ..< 3 {
-            if let valueBoxValue = SqliteValueBox(basePath: basePath + "/db", queue: queue, isTemporary: isTemporary, isReadOnly: isReadOnly, useCaches: useCaches, removeDatabaseOnError: removeDatabaseOnError, encryptionParameters: nil, upgradeProgress: { _ in }) {
+            if let valueBoxValue = SqliteValueBox(basePath: basePath + "/db", queue: queue, isTemporary: isTemporary, isReadOnly: isReadOnly, useCaches: useCaches, removeDatabaseOnError: removeDatabaseOnError, encryptionParameters: effectiveEncryptionParameters, upgradeProgress: { _ in }) {
                 valueBox = valueBoxValue
                 break
             } else {
@@ -724,7 +744,7 @@ public final class AccountManager<Types: AccountManagerTypes> {
         return AccountManagerImpl<Types>.getCurrentRecords(basePath: basePath)
     }
     
-    public init(basePath: String, isTemporary: Bool, isReadOnly: Bool, useCaches: Bool, removeDatabaseOnError: Bool, accessChallenge: AccountManagerAccessChallenge) {
+    public init(basePath: String, isTemporary: Bool, isReadOnly: Bool, useCaches: Bool, removeDatabaseOnError: Bool, accessChallenge: AccountManagerAccessChallenge, encryptionParameters: ValueBoxEncryptionParameters? = nil) {
         self.queue = sharedQueue
         self.basePath = basePath
         var temporarySessionId: Int64 = 0
@@ -732,7 +752,7 @@ public final class AccountManager<Types: AccountManagerTypes> {
         self.temporarySessionId = temporarySessionId
         let queue = self.queue
         self.impl = QueueLocalObject(queue: queue, generate: {
-            if let value = AccountManagerImpl<Types>(queue: queue, basePath: basePath, isTemporary: isTemporary, isReadOnly: isReadOnly, useCaches: useCaches, removeDatabaseOnError: removeDatabaseOnError, temporarySessionId: temporarySessionId, accessChallenge: accessChallenge) {
+            if let value = AccountManagerImpl<Types>(queue: queue, basePath: basePath, isTemporary: isTemporary, isReadOnly: isReadOnly, useCaches: useCaches, removeDatabaseOnError: removeDatabaseOnError, temporarySessionId: temporarySessionId, accessChallenge: accessChallenge, encryptionParameters: encryptionParameters) {
                 return value
             } else {
                 postboxLogSync()

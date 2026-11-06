@@ -1087,7 +1087,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             }
         })
         
-        let accountManager: AccountManager<TelegramAccountManagerTypes> = setupAccountManager(basePath: rootPath + "/accounts-metadata", isTemporary: false, isReadOnly: false, useCaches: true, removeDatabaseOnError: true, resetLocalSecrets: {
+        let accountManager: AccountManager<TelegramAccountManagerTypes> = setupAccountManager(basePath: rootPath + "/accounts-metadata", isTemporary: false, isReadOnly: false, useCaches: true, removeDatabaseOnError: true, encryptionParameters: encryptionParameters, resetLocalSecrets: {
             try resetWalletLocalSecrets()
         })
         self.accountManager = accountManager
