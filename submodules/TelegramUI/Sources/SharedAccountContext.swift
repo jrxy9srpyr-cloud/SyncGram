@@ -788,10 +788,7 @@ public final class SharedAccountContextImpl: SharedAccountContext {
                                 }
                                 |> take(1)
                                 |> deliverOnMainQueue
-                                |> map { [weak self] _ -> Void in
-                                    guard let self else {
-                                        return
-                                    }
+                                |> map { _ -> Void in
                                     Logger.shared.log("SharedAccountContext", "starting state management for imported account \(account.id.int64)")
                                     self.importedAccountIds.remove(account.id)
                                     account.resetStateManagement()
