@@ -44,8 +44,10 @@ public final class SyncGramToast: UIView {
         self.pill.addSubview(self.iconView)
         self.pill.addSubview(self.label)
 
-        self.isAccessibilityElement = true
-        self.accessibilityLabel = message
+        self.isAccessibilityElement = false
+        self.pill.isAccessibilityElement = true
+        self.pill.accessibilityLabel = message
+        self.pill.accessibilityTraits = .staticText
 
         let pan = UIPanGestureRecognizer(target: self, action: #selector(self.handlePan(_:)))
         self.pill.addGestureRecognizer(pan)
@@ -79,6 +81,26 @@ public final class SyncGramToast: UIView {
         toast.pill.alpha = 0.0
 
         self.current = toast
+
+        if case .success = style {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
+        UIAccessibility.post(notification: .announcement, argument: message)
+
+        if UIAccessibility.isReduceMotionEnabled {
+            toast.pill.center = targetCenter
+            toast.pill.alpha = 0.0
+            UIView.animate(withDuration: 0.15, animations: {
+                toast.pill.alpha = 1.0
+            }, completion: { finished in
+                if finished {
+                    toast.scheduleHide()
+                }
+            })
+            return
+        }
 
         UIView.animate(withDuration: 0.36, delay: 0.0, usingSpringWithDamping: 0.84, initialSpringVelocity: 0.5, options: [.allowUserInteraction, .beginFromCurrentState], animations: {
             toast.pill.center = targetCenter
@@ -121,15 +143,24 @@ public final class SyncGramToast: UIView {
             width: pillWidth - self.iconView.frame.maxX - iconSpacing - horizontalInsets,
             height: labelSize.height
         )
+        self.pill.accessibilityFrame = self.pill.convert(self.pill.bounds, to: nil)
     }
 
     private func scheduleHide() {
         self.hideWorkItem?.cancel()
+        let delay: TimeInterval
+        if UIAccessibility.isVoiceOverRunning {
+            delay = 8.0
+        } else if self.label.frame.height > 24.0 {
+            delay = 6.0
+        } else {
+            delay = 4.0
+        }
         let workItem = DispatchWorkItem { [weak self] in
             self?.hide()
         }
         self.hideWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.6, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
     private func hide() {

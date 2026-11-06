@@ -226,6 +226,13 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
     return AccountManagerState(
         notificationKeys: records.records.compactMap { record -> AccountManagerState.NotificationKey? in
             for attribute in record.attributes {
+                if case let .notificationKeys(keys) = attribute {
+                    return AccountManagerState.NotificationKey(
+                        accountId: record.id,
+                        id: keys.id,
+                        key: keys.key
+                    )
+                }
                 if case let .backupData(backupData) = attribute {
                     if let notificationEncryptionKeyId = backupData.data?.notificationEncryptionKeyId, let notificationEncryptionKey = backupData.data?.notificationEncryptionKey {
                         return AccountManagerState.NotificationKey(

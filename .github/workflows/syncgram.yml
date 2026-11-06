@@ -3,6 +3,10 @@ name: SyncGram
 on:
   workflow_dispatch:
 
+concurrency:
+  group: syncgram-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: xcode-27
@@ -11,6 +15,7 @@ jobs:
     env:
       API_ID: ${{ secrets.SYNCGRAM_API_ID }}
       API_HASH: ${{ secrets.SYNCGRAM_API_HASH }}
+      APP_BUILD_NUMBER: ${{ github.run_number }}
 
     steps:
       - name: Checkout
@@ -18,6 +23,9 @@ jobs:
         with:
           fetch-depth: 1
           submodules: false
+
+      - name: Check whitespace
+        run: git diff --check
 
       - name: Restore Bazel cache
         id: bazel-cache
@@ -52,34 +60,51 @@ jobs:
 
       - name: Inject API credentials
         run: |
-          if [ -n "$API_ID" ]; then
-            python3 -c "import json; p='build-system/syncgram-configuration.json'; c=json.load(open(p)); c['api_id']='$API_ID'; c['api_hash']='$API_HASH'; json.dump(c, open(p,'w'), indent=2); print('api_id injected')"
-          else
-            echo "no API credentials provided, building with placeholders"
+          if [ -z "$API_ID" ] || [ -z "$API_HASH" ]; then
+            echo "::error::SYNCGRAM_API_ID / SYNCGRAM_API_HASH secrets are required"
+            exit 1
           fi
+          python3 -c "import json,os; p='build-system/syncgram-configuration.json'; c=json.load(open(p)); c['api_id']=os.environ['API_ID']; c['api_hash']=os.environ['API_HASH']; json.dump(c, open(p,'w'), indent=2); print('api_id injected')"
 
       - name: Build SyncGram (release, arm64)
         run: |
+          rm -rf build/artifacts
           START=$(date +%s)
-          python3 -u build-system/Make/Make.py --bazelUserRoot=/private/var/tmp/_bazel_root --overrideXcodeVersion build --configurationPath=build-system/syncgram-configuration.json --codesigningInformationPath=build-system/fake-codesigning --configuration=release_arm64 --buildNumber=1000
+          python3 -u build-system/Make/Make.py --bazelUserRoot=/private/var/tmp/_bazel_root --overrideXcodeVersion build --configurationPath=build-system/syncgram-configuration.json --codesigningInformationPath=build-system/fake-codesigning --configuration=release_arm64 --buildNumber=$((1000 + APP_BUILD_NUMBER))
           echo "build seconds: $(( $(date +%s) - START ))"
 
       - name: Collect IPA
-        if: always()
+        if: success()
         run: |
           mkdir -p build/artifacts
-          for p in bazel-bin/Telegram/Telegram.ipa bazel-out/*/bin/Telegram/Telegram.ipa; do
-            if [ -f "$p" ]; then cp "$p" build/artifacts/SyncGram.ipa; break; fi
-          done
-          ls -lh build/artifacts || true
+          cp bazel-bin/Telegram/Telegram.ipa build/artifacts/SyncGram.ipa
+          ls -lh build/artifacts/SyncGram.ipa
+
+      - name: Verify IPA
+        if: success()
+        run: |
+          set -euo pipefail
+          STAGE=$(mktemp -d)
+          unzip -q build/artifacts/SyncGram.ipa -d "$STAGE"
+          APP=$(ls -d "$STAGE"/Payload/*.app | head -1)
+          BID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          VER=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
+          test "$BID" = "com.lvxsynce.syncgram"
+          test "$VER" = "$((1000 + APP_BUILD_NUMBER))"
+          test -d "$APP/_CodeSignature"
+          test -f "$APP/embedded.mobileprovision"
+          lipo -archs "$APP/Telegram" | grep -qw arm64
+          shasum -a 256 build/artifacts/SyncGram.ipa | tee build/artifacts/SyncGram.ipa.sha256
 
       - name: Upload IPA
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: SyncGram-ipa
-          path: build/artifacts/*.ipa
-          if-no-files-found: warn
+          path: |
+            build/artifacts/SyncGram.ipa
+            build/artifacts/SyncGram.ipa.sha256
+          if-no-files-found: error
 
       - name: Save Bazel cache
         if: always()

@@ -147,6 +147,7 @@ public final class SyncGramAccountsPanelController: ViewController {
 
     private let disposable = MetaDisposable()
     private var latestById: [Int64: (EnginePeer.Id, EngineMessage.Id?)] = [:]
+    private var usernameById: [Int64: String] = [:]
 
     public init(context: AccountContext) {
         self.context = context
@@ -330,6 +331,11 @@ public final class SyncGramAccountsPanelController: ViewController {
             let emoji = SyncGramAccountSettings.shared.emoji(for: item.recordId.int64)
             row.title.text = emoji.isEmpty ? item.title : "\(emoji) \(item.title)"
             row.username.text = "@\(item.username ?? "—") · \(item.unreadTotal) непрочитанных"
+            if let username = item.username {
+                self.usernameById[item.recordId.int64] = username
+            } else {
+                self.usernameById.removeValue(forKey: item.recordId.int64)
+            }
             row.categories.text = "\(item.unreadPrivate) личных · \(item.unreadGroups) групп · \(item.unreadChannels) каналов"
             if let lastChatTitle = item.lastChatTitle, let lastMessageText = item.lastMessageText {
                 row.lastMessage.text = "\(lastChatTitle): \(lastMessageText)"
@@ -446,10 +452,10 @@ public final class SyncGramAccountsPanelController: ViewController {
     }
 
     @objc private func copyUsernameTapped(_ sender: UIButton) {
-        guard let username = sender.accessibilityHint else {
+        guard let username = self.usernameById[Int64(sender.tag)], !username.isEmpty else {
             return
         }
-        UIPasteboard.general.string = username
+        UIPasteboard.general.string = "@\(username)"
         SyncGramToast.show("Username @\(username) скопирован")
     }
 

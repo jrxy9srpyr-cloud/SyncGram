@@ -216,6 +216,11 @@ public final class AccountStateManager {
             }
         }
         private let operationDisposable = MetaDisposable()
+        /// The first difference request must not be issued while the network is still paused.
+        /// Such a request never completes (it is not even retried), so `isUpdating` would stay
+        /// `true` forever and the chat list would show «Обновление…» until the app is restarted.
+        private var canStartPolling = false
+        private let connectionGateDisposable = MetaDisposable()
         private var operationTimer: SignalKitTimer?
         
         private var currentChannelOperationsContext: ChannelOperationsContext?
@@ -423,11 +428,30 @@ public final class AccountStateManager {
             self.updateConfigRequested = updateConfigRequested
             self.isPremiumUpdated = isPremiumUpdated
             self.messagesRemovedContext = messagesRemovedContext
+
+            self.connectionGateDisposable.set((network.shouldKeepConnection.get()
+            |> deliverOn(queue)).start(next: { [weak self] value in
+                guard let self else {
+                    return
+                }
+                self.canStartPolling = value
+                if value {
+                    self.startFirstOperation()
+                } else {
+                    // A poll issued on a connection that has just been disallowed may never
+                    // complete. Cancel it so the next allowed transition can start a fresh one.
+                    self.operationDisposable.dispose()
+                    if let first = self.operations.first, case .pollDifference = first.content {
+                        first.isRunning = false
+                    }
+                }
+            }))
         }
         
         deinit {
             self.updateServiceDisposable.dispose()
             self.operationDisposable.dispose()
+            self.connectionGateDisposable.dispose()
             self.appliedMaxMessageIdDisposable.dispose()
             self.appliedQtsDisposable.dispose()
             self.reportMessageDeliveryDisposable.dispose()
@@ -445,7 +469,15 @@ public final class AccountStateManager {
                     }))
                     self.network.addUpdateSink(self.updateService!)
                 }
-                self.operationDisposable.set(nil)
+                self.operationDisposable.dispose()
+                // A stuck `pollDifference` is not cancelled by merely replacing the operation
+                // queue: `replaceOperations` keeps running operations and `startFirstOperation`
+                // then returns early. Drop the in-flight polling operation so the fresh pass can
+                // actually start.
+                if let first = self.operations.first, case .pollDifference = first.content {
+                    first.isRunning = false
+                    self.operations.removeFirst()
+                }
                 self.replaceOperations(with: .pollDifference(self.getNextId(), AccountFinalStateEvents()))
                 self.startFirstOperation()
                 
@@ -817,6 +849,12 @@ public final class AccountStateManager {
             let currentValidityMarker = self.currentValidityMarker
             switch operation.content {
             case let .pollDifference(_, currentEvents):
+                if !self.canStartPolling {
+                    // Wait for `network.shouldKeepConnection`. The subscription in `init` calls
+                    // `startFirstOperation` again as soon as the connection is allowed.
+                    operation.isRunning = false
+                    return
+                }
                 self.operationTimer?.invalidate()
                 self.currentIsUpdatingValue = true
                 let queue = self.queue
@@ -954,7 +992,7 @@ public final class AccountStateManager {
                 }
                 |> deliverOn(self.queue)
                 
-                let _ = signal.start(next: { [weak self] difference, finalState, skipBecauseOfError, resetState in
+                self.operationDisposable.set(signal.start(next: { [weak self] difference, finalState, skipBecauseOfError, resetState in
                     guard let strongSelf = self else {
                         return
                     }
@@ -1007,7 +1045,7 @@ public final class AccountStateManager {
                             strongSelf.startFirstOperation()
                         }
                     }
-                })
+                }))
             case let .collectUpdateGroups(_, timeout):
                 self.operationTimer?.invalidate()
                 let operationTimer = SignalKitTimer(timeout: timeout, repeat: false, completion: { [weak self] in

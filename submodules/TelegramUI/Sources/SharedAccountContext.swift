@@ -197,6 +197,10 @@ public final class SharedAccountContextImpl: SharedAccountContext {
     /// Imported accounts start their first sync only after the network is online, so the initial
     /// `updates.getState` is not issued while the account is still not allowed to connect.
     private let deferredStateStartDisposables = DisposableDict<AccountRecordId>()
+    /// Accounts created by the session importer in this process. Deliberately not persisted: a
+    /// cold start loads the account through the regular `AuthorizedAccountState` path and must not
+    /// wait for anything.
+    private var importedAccountIds = Set<AccountRecordId>()
     private let activeAccountsWithInfoPromise = Promise<(primary: AccountRecordId?, accounts: [AccountWithInfo])>()
     public var activeAccountsWithInfo: Signal<(primary: AccountRecordId?, accounts: [AccountWithInfo]), NoError> {
         return self.activeAccountsWithInfoPromise.get()
@@ -767,13 +771,14 @@ public final class SharedAccountContextImpl: SharedAccountContext {
 
                             self.activeAccountsValue!.accounts.append((account.id, context, accountRecord.2))
                             
-                            self.managedAccountDisposables.set(self.updateAccountBackupData(account: account).start(), forKey: account.id)
-                            if records[accountRecord.0]?.backupData != nil {
-                                // A session was just imported. Start its first sync only once the
-                                // network is actually connected: otherwise the initial
-                                // `updates.getState` can be issued on a connection that is not
-                                // allowed yet and the chat list stays on «Обновление…» until the
-                                // app is restarted.
+                            self.managedAccountDisposables.set(nil, forKey: account.id)
+                            self.finalizeImportedAccountRecord(account: account)
+                            if self.importedAccountIds.contains(account.id) {
+                                // A session was just imported in this process. Do not start the
+                                // first sync until the connection is actually allowed: a request
+                                // issued on a paused connection never completes and `isUpdating`
+                                // stays `true` for good (the chat list shows «Обновление…» until
+                                // the app is restarted).
                                 let disposable = (account.network.connectionStatus
                                 |> filter { status -> Bool in
                                     if case .online = status {
@@ -782,10 +787,13 @@ public final class SharedAccountContextImpl: SharedAccountContext {
                                     return false
                                 }
                                 |> take(1)
-                                |> timeout(20.0, queue: .mainQueue(), alternate: .single(ConnectionStatus.waitingForNetwork))
                                 |> deliverOnMainQueue
-                                |> map { _ -> Void in
+                                |> map { [weak self] _ -> Void in
+                                    guard let self else {
+                                        return
+                                    }
                                     Logger.shared.log("SharedAccountContext", "starting state management for imported account \(account.id.int64)")
+                                    self.importedAccountIds.remove(account.id)
                                     account.resetStateManagement()
                                 }).start()
                                 self.deferredStateStartDisposables.set(disposable, forKey: account.id)
@@ -1199,30 +1207,46 @@ public final class SharedAccountContextImpl: SharedAccountContext {
         self.didPerformAccountSettingsImport = true
     }
     
-    private func updateAccountBackupData(account: Account) -> Signal<Never, NoError> {
-        return accountBackupData(postbox: account.postbox)
-        |> mapToSignal { backupData -> Signal<Never, NoError> in
-            guard let backupData = backupData else {
-                return .complete()
-            }
-            return self.accountManager.transaction { transaction -> Void in
-                transaction.updateRecord(account.id, { record in
-                    guard let record = record else {
-                        return nil
-                    }
-                    var attributes: [TelegramAccountManagerTypes.Attribute] = record.attributes.filter { attribute in
-                        if case .backupData = attribute {
-                            return false
-                        } else {
-                            return true
+    /// Does not keep the Telegram auth key in the account record. The key lives in the postbox
+    /// keychain (SQLCipher) and the record only needs a non-secret peer identity for deduplication.
+    /// The notification key is preserved because the notification service extension cannot open
+    /// the account postbox.
+    private func finalizeImportedAccountRecord(account: Account) {
+        let peerId = account.peerId.toInt64()
+        let _ = self.accountManager.transaction { transaction -> Void in
+            transaction.updateRecord(account.id, { record in
+                guard let record else {
+                    return nil
+                }
+                var notificationKeys: AccountNotificationKeys?
+                for attribute in record.attributes {
+                    switch attribute {
+                    case let .notificationKeys(keys):
+                        notificationKeys = keys
+                    case let .backupData(backupData):
+                        if let id = backupData.data?.notificationEncryptionKeyId, let key = backupData.data?.notificationEncryptionKey {
+                            notificationKeys = AccountNotificationKeys(id: id, key: key)
                         }
+                    default:
+                        break
                     }
-                    attributes.append(.backupData(AccountBackupDataAttribute(data: backupData)))
-                    return AccountRecord(id: record.id, attributes: attributes, temporarySessionId: record.temporarySessionId)
-                })
-            }
-            |> ignoreValues
-        }
+                }
+                var attributes: [TelegramAccountManagerTypes.Attribute] = []
+                for attribute in record.attributes {
+                    switch attribute {
+                    case .backupData, .peerIdentity, .notificationKeys:
+                        break
+                    default:
+                        attributes.append(attribute)
+                    }
+                }
+                attributes.append(.peerIdentity(AccountPeerIdentity(peerId: peerId)))
+                if let notificationKeys = notificationKeys {
+                    attributes.append(.notificationKeys(notificationKeys))
+                }
+                return AccountRecord(id: record.id, attributes: attributes, temporarySessionId: record.temporarySessionId)
+            })
+        }.start()
     }
     
     private func updateCurrentCall(call: PresentationCurrentCall?) {
@@ -1951,6 +1975,11 @@ public final class SharedAccountContextImpl: SharedAccountContext {
         |> runOn(Queue.mainQueue())
     }
     
+    public func markAccountAsImported(_ id: AccountRecordId) {
+        assert(Queue.mainQueue().isCurrent())
+        self.importedAccountIds.insert(id)
+    }
+
     public func setAccountUserInterfaceInUse(_ id: AccountRecordId) -> Disposable {
         assert(Queue.mainQueue().isCurrent())
         let context: AccountUserInterfaceInUseContext

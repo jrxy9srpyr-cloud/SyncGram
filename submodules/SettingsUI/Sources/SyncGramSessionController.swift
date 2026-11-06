@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import LocalAuthentication
 import UniformTypeIdentifiers
 import SwiftSignalKit
 import Display
@@ -32,8 +33,6 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
 
     private var exportFileURL: URL?
     private var isExportingPicker = false
-    private var importWatchDisposable: Disposable?
-    private var importWatchToken: Int = 0
 
     public init(context: AccountContext) {
         self.context = context
@@ -192,11 +191,41 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
             self.presentError("Введите контрольный вопрос.")
             return
         }
-        guard answer.count >= 4 else {
-            self.presentError("Ответ должен быть не короче 4 символов.")
+        guard answer.count >= 8 else {
+            self.presentError("Ответ должен быть не короче 8 символов: файл даёт доступ к аккаунту, короткий ответ можно подобрать.")
             return
         }
 
+        self.requestExportAuthentication { [weak self] allowed in
+            guard let self else {
+                return
+            }
+            guard allowed else {
+                self.presentError("Не удалось подтвердить личность. Экспорт отменён.")
+                return
+            }
+            self.performExport(question: question, answer: answer)
+        }
+    }
+
+    /// The session file contains the account auth key. Require device-owner authentication before
+    /// collecting it, so a briefly unlocked phone cannot be used to export the account.
+    private func requestExportAuthentication(completion: @escaping (Bool) -> Void) {
+        let context = LAContext()
+        var error: NSError?
+        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
+            context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Экспорт ключей аккаунта SyncGram") { success, _ in
+                DispatchQueue.main.async {
+                    completion(success)
+                }
+            }
+        } else {
+            // No passcode/biometry configured: there is nothing extra to verify against.
+            completion(true)
+        }
+    }
+
+    private func performExport(question: String, answer: String) {
         self.setBusy(true)
         self.statusLabel.text = "Готовим файл…"
 
@@ -238,7 +267,7 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
                     let formatter = DateFormatter()
                     formatter.dateFormat = "yyyy-MM-dd-HHmm"
                     let url = FileManager.default.temporaryDirectory.appendingPathComponent("SyncGram-Session-\(formatter.string(from: Date())).\(SyncGramSessionArchive.fileExtension)")
-                    try data.write(to: url, options: .atomic)
+                    try data.write(to: url, options: [.atomic, .completeFileProtection])
                     result = .success((data, url))
                 } catch {
                     result = .failure(error)
@@ -278,6 +307,10 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
     public func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         if self.isExportingPicker {
             self.isExportingPicker = false
+            if let url = urls.first ?? self.exportFileURL {
+                try? FileManager.default.removeItem(at: url)
+            }
+            self.exportFileURL = nil
             return
         }
         guard let url = urls.first else {
@@ -287,6 +320,12 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
     }
 
     public func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        if self.isExportingPicker {
+            if let url = self.exportFileURL {
+                try? FileManager.default.removeItem(at: url)
+            }
+            self.exportFileURL = nil
+        }
         self.isExportingPicker = false
         self.setBusy(false)
     }
@@ -294,7 +333,12 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
     private func handlePickedFile(_ url: URL) {
         let data: Data
         do {
-            data = try Data(contentsOf: url)
+            let values = try url.resourceValues(forKeys: [.fileSizeKey])
+            if let fileSize = values.fileSize, fileSize > 8 * 1024 * 1024 {
+                self.presentError("Файл слишком большой для файла сессии SyncGram.")
+                return
+            }
+            data = try Data(contentsOf: url, options: .mappedIfSafe)
         } catch {
             self.presentError("Не удалось прочитать файл.")
             return
@@ -380,10 +424,14 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
             }
             switch result {
             case let .created(accountId), let .existing(accountId):
-                self.statusLabel.text = "Импортировано: \(snapshot.accountTitle) (\(username)). Файл создан \(created). Входим в аккаунт по сохранённой сессии…"
+                self.statusLabel.text = "Импортировано: \(snapshot.accountTitle) (\(username)). Входим в аккаунт по сохранённой сессии…"
                 SyncGramToast.show("Сессия «\(snapshot.accountTitle)» импортирована")
+                self.context.sharedContext.markAccountAsImported(accountId)
                 self.context.sharedContext.switchToAccount(id: accountId, fromSettingsController: nil, withChatListController: nil)
-                self.watchImportedAccount(id: accountId)
+            case .invalidBackupData:
+                self.setBusy(false)
+                self.statusLabel.text = "Файл сессии повреждён."
+                SyncGramToast.show("Ключи сессии в файле повреждены")
             case .missingBackupData:
                 self.statusLabel.text = "Импортировано: \(snapshot.accountTitle) (\(username)). Файл создан \(created). В файле нет ключей сессии — восстановлены только настройки SyncGram, войдите по коду из Telegram."
                 SyncGramToast.show("Настройки SyncGram импортированы")
@@ -392,96 +440,6 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
     }
 
     // MARK: - Helpers
-
-    /// An imported account is created inside a running app, which is not the same as loading it
-    /// from disk at launch: its first `stateManager` pass can start before the network is ready and
-    /// then stay in `.updating` forever (the chat list shows «Обновление…» until the app is
-    /// restarted). Watch the new account, bounce the connection once if it does not come online,
-    /// and as a last resort ask the user to reopen the app, which loads the account through the
-    /// regular `AuthorizedAccountState` path.
-    private func watchImportedAccount(id: AccountRecordId) {
-        self.importWatchToken += 1
-        self.waitForImportedAccountOnline(id: id, attempt: 0)
-    }
-
-    private func importedAccountContextSignal(id: AccountRecordId) -> Signal<AccountContext?, NoError> {
-        return self.context.sharedContext.activeAccountContexts
-        |> map { primary, accounts, _ -> AccountContext? in
-            if let entry = accounts.first(where: { $0.0 == id }) {
-                return entry.1
-            }
-            if let primary, primary.account.id == id {
-                return primary
-            }
-            return nil
-        }
-        |> filter { $0 != nil }
-        |> take(1)
-    }
-
-    private func waitForImportedAccountOnline(id: AccountRecordId, attempt: Int) {
-        let token = self.importWatchToken
-        let online = self.importedAccountContextSignal(id: id)
-        |> mapToSignal { context -> Signal<Bool, NoError> in
-            guard let context else {
-                return .single(true)
-            }
-            return context.account.network.connectionStatus
-            |> map { status -> Bool in
-                if case .online = status {
-                    return true
-                }
-                return false
-            }
-            |> filter { $0 }
-            |> take(1)
-        }
-        |> timeout(15.0, queue: .mainQueue(), alternate: .single(false))
-        |> deliverOnMainQueue
-
-        self.importWatchDisposable = online.start(next: { [weak self] isOnline in
-            guard let self, token == self.importWatchToken else {
-                return
-            }
-            if isOnline {
-                Logger.shared.log("SyncGram", "imported account \(id.int64) is online")
-                self.importWatchDisposable = nil
-                return
-            }
-            if attempt == 0 {
-                Logger.shared.log("SyncGram", "imported account \(id.int64) did not come online, bouncing the connection")
-                let _ = self.importedAccountContextSignal(id: id).start(next: { context in
-                    guard let context else {
-                        return
-                    }
-                    let account = context.account
-                    account.shouldBeServiceTaskMaster.set(.single(.never))
-                    Queue.mainQueue().after(1.5) {
-                        account.shouldBeServiceTaskMaster.set(.single(.now))
-                        account.resetStateManagement()
-                    }
-                })
-                self.waitForImportedAccountOnline(id: id, attempt: 1)
-            } else {
-                Logger.shared.log("SyncGram", "imported account \(id.int64) is still not online, asking for a restart")
-                self.presentImportRestartNotice()
-            }
-        })
-    }
-
-    private func presentImportRestartNotice() {
-        guard self.presentedViewController == nil else {
-            return
-        }
-        let alert = UIAlertController(title: "Аккаунт добавлен", message: "Telegram не успел подключиться к серверам в этом запуске. Закройте приложение и откройте его снова — чаты загрузятся как обычно.", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Позже", style: .cancel, handler: nil))
-        alert.addAction(UIAlertAction(title: "Закрыть приложение", style: .default, handler: { _ in
-            exit(0)
-        }))
-        if let rootController = self.context.sharedContext.mainWindow?.viewController as? UIViewController {
-            rootController.present(alert, animated: true, completion: nil)
-        }
-    }
 
     private func setBusy(_ busy: Bool) {
         self.exportButton.isEnabled = !busy
@@ -493,7 +451,9 @@ public final class SyncGramSessionController: ViewController, UIDocumentPickerDe
     private func message(for error: Error) -> String {
         switch error {
         case SyncGramSessionArchiveError.wrongAnswer:
-            return "Неверный ответ или файл повреждён. Расшифровать не удалось."
+            return "Ответ не подошёл. Попробуйте ещё раз — регистр букв не важен. Если ответ точно верный, файл мог быть изменён."
+        case SyncGramSessionArchiveError.malformedPayload:
+            return "Файл расшифрован, но его содержимое несовместимо с этой версией SyncGram."
         case SyncGramSessionArchiveError.invalidFile:
             return "Это не файл сессии SyncGram."
         case SyncGramSessionArchiveError.unsupportedVersion:

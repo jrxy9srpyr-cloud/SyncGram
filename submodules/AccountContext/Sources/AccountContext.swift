@@ -1461,6 +1461,9 @@ public protocol SharedAccountContext: AnyObject {
     
     func updateNotificationTokensRegistration()
     func setAccountUserInterfaceInUse(_ id: AccountRecordId) -> Disposable
+    /// Marks an account that was created from an imported session file in this process. Only such
+    /// an account defers its first sync until the network is connected.
+    func markAccountAsImported(_ id: AccountRecordId)
     func handleTextLinkAction(context: AccountContext, peerId: EnginePeer.Id?, navigateDisposable: MetaDisposable, controller: ViewController, action: TextLinkItemActionType, itemLink: TextLinkItem)
     func openSearch(filter: ChatListSearchFilter, query: String?)
     func navigateToChat(accountId: AccountRecordId, peerId: EnginePeer.Id, messageId: EngineMessage.Id?)

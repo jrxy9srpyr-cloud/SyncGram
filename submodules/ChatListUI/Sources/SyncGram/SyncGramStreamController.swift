@@ -294,6 +294,35 @@ private final class SyncGramStreamMessageView: UIControl {
         if item.isDeleted {
             self.bubbleView.alpha = 0.72
         }
+
+        // VoiceOver: the bubble must be a single element with the whole message. `TextNode` hides
+        // itself from accessibility, so without this the text would not be readable at all.
+        self.isAccessibilityElement = true
+        self.accessibilityTraits = .button
+        var spokenParts: [String] = []
+        if !item.authorName.isEmpty {
+            spokenParts.append(item.authorName)
+        }
+        if !self.contextText.isEmpty {
+            spokenParts.append(self.contextText)
+        }
+        if item.isDeleted {
+            spokenParts.append("удалено")
+        }
+        if !item.mediaText.isEmpty {
+            spokenParts.append(item.mediaText)
+        }
+        if !item.plainText.isEmpty {
+            spokenParts.append(item.plainText)
+        }
+        spokenParts.append(self.timeLabel.text ?? "")
+        self.accessibilityLabel = spokenParts.filter { !$0.isEmpty }.joined(separator: ", ")
+        self.accessibilityHint = item.threadId != nil ? "Открыть тему" : "Открыть чат"
+    }
+
+    override func accessibilityActivate() -> Bool {
+        self.sendActions(for: .touchUpInside)
+        return true
     }
 
     required init?(coder: NSCoder) {

@@ -239,6 +239,8 @@ public final class SyncGramShaderView: UIView {
     private var lastTimestamp: CFTimeInterval = 0
     private var elapsed: Float = 0.0
     private var isPausedByHost = false
+    private var reduceMotionObserver: NSObjectProtocol?
+    private var didRenderReduceMotionFrame = false
     private var isApplicationActive = true
     private var isDark = false
     private var accentColor = SIMD3<Float>(0.72, 0.52, 0.36)
@@ -264,6 +266,10 @@ public final class SyncGramShaderView: UIView {
 
         NotificationCenter.default.addObserver(self, selector: #selector(self.applicationStateChanged), name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(self.applicationStateChanged), name: UIApplication.didBecomeActiveNotification, object: nil)
+        self.reduceMotionObserver = NotificationCenter.default.addObserver(forName: UIAccessibility.reduceMotionStatusDidChangeNotification, object: nil, queue: .main, using: { [weak self] _ in
+            self?.didRenderReduceMotionFrame = false
+            self?.updateLinkState()
+        })
     }
 
     required public init?(coder: NSCoder) {
@@ -272,6 +278,9 @@ public final class SyncGramShaderView: UIView {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+        if let reduceMotionObserver = self.reduceMotionObserver {
+            NotificationCenter.default.removeObserver(reduceMotionObserver)
+        }
         self.displayLink?.invalidate()
     }
 
@@ -323,6 +332,23 @@ public final class SyncGramShaderView: UIView {
     }
 
     private func updateLinkState() {
+        // Reduce Motion is a request to stop, not to slow down: draw one static frame and keep
+        // the display link off entirely.
+        if UIAccessibility.isReduceMotionEnabled {
+            self.displayLink?.isPaused = true
+            if self.window == nil {
+                self.displayLink?.invalidate()
+                self.displayLink = nil
+                self.lastTimestamp = 0.0
+            }
+            if !self.didRenderReduceMotionFrame, self.window != nil, let resources = Shared.resources {
+                self.didRenderReduceMotionFrame = true
+                self.elapsed = 8.0
+                self.render(resources: resources)
+            }
+            return
+        }
+        self.didRenderReduceMotionFrame = false
         let visible = self.window != nil && !self.isHidden && self.alpha > 0.01
         let shouldRun = visible && self.isApplicationActive && !self.isPausedByHost
         if shouldRun {
@@ -386,7 +412,7 @@ public final class SyncGramShaderView: UIView {
             delta = timestamp - self.lastTimestamp
         }
         self.lastTimestamp = timestamp
-        let speed: Float = UIAccessibility.isReduceMotionEnabled ? 0.25 : 1.0
+        let speed: Float = 1.0
         self.elapsed += Float(min(max(delta, 0.0), 0.1)) * speed
         self.render(resources: resources)
     }

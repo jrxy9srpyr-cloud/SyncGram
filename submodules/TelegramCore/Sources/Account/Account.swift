@@ -335,24 +335,38 @@ public func accountWithId(accountManager: AccountManager<TelegramAccountManagerT
                     return postbox.transaction { transaction -> (PostboxCoding?, LocalizationSettings?, ProxySettings?, NetworkSettings?, AppConfiguration) in
                         var state = transaction.getState()
                         if state == nil, let backupData = backupData {
-                            let backupState = AuthorizedAccountState(isTestingEnvironment: beginWithTestingEnvironment, masterDatacenterId: backupData.masterDatacenterId, peerId: PeerId(backupData.peerId), state: nil, invalidatedChannels: [])
-                            state = backupState
-                            let dict = NSMutableDictionary()
-                            dict.setObject(MTDatacenterAuthInfo(authKey: backupData.masterDatacenterKey, authKeyId: backupData.masterDatacenterKeyId, validUntilTimestamp: Int32.max, saltSet: [], authKeyAttributes: [:])!, forKey: backupData.masterDatacenterId as NSNumber)
-                            
-                            for (id, datacenterKey) in backupData.additionalDatacenterKeys {
-                                dict.setObject(MTDatacenterAuthInfo(
-                                    authKey: datacenterKey.key,
-                                    authKeyId: datacenterKey.keyId,
-                                    validUntilTimestamp: Int32.max,
-                                    saltSet: [],
-                                    authKeyAttributes: [:]
-                                )!, forKey: id as NSNumber)
+                            // The key material comes from a user-supplied file, so validate every
+                            // piece instead of force-unwrapping. A malformed block leaves the
+                            // account unauthorized rather than crashing the app.
+                            var restoredAuthInfo: NSMutableDictionary?
+                            if let masterAuthInfo = MTDatacenterAuthInfo(authKey: backupData.masterDatacenterKey, authKeyId: backupData.masterDatacenterKeyId, validUntilTimestamp: Int32.max, saltSet: [], authKeyAttributes: [:]) {
+                                let dict = NSMutableDictionary()
+                                dict.setObject(masterAuthInfo, forKey: backupData.masterDatacenterId as NSNumber)
+                                var isValid = true
+                                for (id, datacenterKey) in backupData.additionalDatacenterKeys {
+                                    guard let authInfo = MTDatacenterAuthInfo(
+                                        authKey: datacenterKey.key,
+                                        authKeyId: datacenterKey.keyId,
+                                        validUntilTimestamp: Int32.max,
+                                        saltSet: [],
+                                        authKeyAttributes: [:]
+                                    ) else {
+                                        isValid = false
+                                        break
+                                    }
+                                    dict.setObject(authInfo, forKey: id as NSNumber)
+                                }
+                                if isValid {
+                                    restoredAuthInfo = dict
+                                }
                             }
-                            
-                            transaction.setState(backupState)
-                            if let data = try? NSKeyedArchiver.archivedData(withRootObject: dict, requiringSecureCoding: false) {
-                                transaction.setKeychainEntry(data, forKey: "persistent:datacenterAuthInfoById")
+                            if let restoredAuthInfo = restoredAuthInfo {
+                                let backupState = AuthorizedAccountState(isTestingEnvironment: beginWithTestingEnvironment, masterDatacenterId: backupData.masterDatacenterId, peerId: PeerId(backupData.peerId), state: nil, invalidatedChannels: [])
+                                state = backupState
+                                transaction.setState(backupState)
+                                if let data = try? NSKeyedArchiver.archivedData(withRootObject: restoredAuthInfo, requiringSecureCoding: false) {
+                                    transaction.setKeychainEntry(data, forKey: "persistent:datacenterAuthInfoById")
+                                }
                             }
                         }
                         

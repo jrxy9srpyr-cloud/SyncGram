@@ -14,6 +14,28 @@ public struct AccountSupportUserInfo: Codable, Equatable {
     }
 }
 
+/// Non-secret identity of an account, kept in the account record so an imported session can be
+/// matched to an existing account without keeping the Telegram auth key in the account metadata.
+public struct AccountPeerIdentity: Codable, Equatable {
+    public let peerId: Int64
+
+    public init(peerId: Int64) {
+        self.peerId = peerId
+    }
+}
+
+/// The master notification key is required by the notification service extension, which cannot
+/// open the account postbox. It is the only secret that has to stay in the account metadata.
+public struct AccountNotificationKeys: Codable, Equatable {
+    public let id: Data
+    public let key: Data
+
+    public init(id: Data, key: Data) {
+        self.id = id
+        self.key = key
+    }
+}
+
 public enum TelegramAccountRecordAttribute: AccountRecordAttribute, Equatable {
     enum CodingKeys: String, CodingKey {
         case backupData
@@ -21,6 +43,8 @@ public enum TelegramAccountRecordAttribute: AccountRecordAttribute, Equatable {
         case sortOrder
         case loggedOut
         case supportUserInfo
+        case peerIdentity
+        case notificationKeys
         case legacyRootObject = "_"
     }
 
@@ -29,6 +53,8 @@ public enum TelegramAccountRecordAttribute: AccountRecordAttribute, Equatable {
     case sortOrder(AccountSortOrderAttribute)
     case loggedOut(LoggedOutAccountAttribute)
     case supportUserInfo(AccountSupportUserInfo)
+    case peerIdentity(AccountPeerIdentity)
+    case notificationKeys(AccountNotificationKeys)
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -43,6 +69,10 @@ public enum TelegramAccountRecordAttribute: AccountRecordAttribute, Equatable {
             self = .loggedOut(loggedOut)
         } else if let supportUserInfo = try? container.decodeIfPresent(AccountSupportUserInfo.self, forKey: .supportUserInfo) {
             self = .supportUserInfo(supportUserInfo)
+        } else if let peerIdentity = try? container.decodeIfPresent(AccountPeerIdentity.self, forKey: .peerIdentity) {
+            self = .peerIdentity(peerIdentity)
+        } else if let notificationKeys = try? container.decodeIfPresent(AccountNotificationKeys.self, forKey: .notificationKeys) {
+            self = .notificationKeys(notificationKeys)
         } else {
             let legacyRootObjectData = try! container.decode(AdaptedPostboxDecoder.RawObjectData.self, forKey: .legacyRootObject)
             if legacyRootObjectData.typeHash == postboxEncodableTypeHash(AccountBackupDataAttribute.self) {
@@ -73,6 +103,10 @@ public enum TelegramAccountRecordAttribute: AccountRecordAttribute, Equatable {
             try container.encode(loggedOut, forKey: .loggedOut)
         case let .supportUserInfo(supportUserInfo):
             try container.encode(supportUserInfo, forKey: .supportUserInfo)
+        case let .peerIdentity(peerIdentity):
+            try container.encode(peerIdentity, forKey: .peerIdentity)
+        case let .notificationKeys(notificationKeys):
+            try container.encode(notificationKeys, forKey: .notificationKeys)
         }
     }
 

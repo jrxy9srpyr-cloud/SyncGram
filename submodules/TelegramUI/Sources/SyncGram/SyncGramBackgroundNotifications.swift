@@ -89,6 +89,12 @@ public enum SyncGramBackgroundNotifications {
         let previous = defaults.object(forKey: key) as? Int
         defaults.set(Int(unread), forKey: key)
 
+        // A muted account still advances its baseline but never posts. Without this the panel
+        // toggle was purely cosmetic.
+        if let mutedUntil = SyncGramAccountSettings.shared.mutedUntil(for: recordId.int64), mutedUntil > Date() {
+            return
+        }
+
         // The first run only records the baseline, otherwise every cold start would notify.
         guard let previous = previous, Int(unread) > previous else {
             return
